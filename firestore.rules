@@ -1,0 +1,205 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 1. Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Global Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // 3. Validation Blueprints
+    function isValidPurchase(data) {
+      return data.keys().hasAll(['userId', 'testId', 'vargId', 'subject', 'purchasedAt', 'paymentId'])
+        && (
+          data.keys().size() == 6 || (
+            data.keys().size() == 9 
+            && data.keys().hasAll(['promoCode', 'amountPaid', 'promoterUserId'])
+            && (data.promoCode == null || (data.promoCode is string && data.promoCode.size() <= 20))
+            && data.amountPaid is number && data.amountPaid >= 0 && data.amountPaid <= 100000
+            && (data.promoterUserId == null || (data.promoterUserId is string && data.promoterUserId.size() <= 128))
+          )
+        )
+        && data.userId == request.auth.uid
+        && data.testId is string && data.testId.size() <= 100
+        && data.vargId in ['varg1', 'varg2', 'varg3', 'gk']
+        && data.subject is string && data.subject.size() <= 50
+        && data.purchasedAt == request.time
+        && data.paymentId is string && data.paymentId.size() <= 100;
+    }
+
+    function isValidPlatformSettings(data) {
+      return data.keys().hasAll(['testPrice', 'promoterCommission', 'studentDiscount', 'updatedAt'])
+        && data.keys().size() == 4
+        && data.testPrice is number && data.testPrice >= 0 && data.testPrice <= 10000
+        && data.promoterCommission is number && data.promoterCommission >= 0 && data.promoterCommission <= 1000
+        && data.studentDiscount is number && data.studentDiscount >= 0 && data.studentDiscount <= 1000
+        && data.updatedAt == request.time;
+    }
+
+    function isValidLeaderboardEntry(data) {
+      return data.keys().hasAll(['userId', 'userName', 'photoURL', 'vargId', 'subject', 'testId', 'totalScore', 'submittedAt'])
+        && data.keys().size() == 8
+        && data.userId == request.auth.uid
+        && data.userName is string && data.userName.size() <= 100
+        && (data.photoURL == null || (data.photoURL is string && data.photoURL.size() <= 1024))
+        && data.vargId is string && data.vargId.size() <= 50
+        && data.subject is string && data.subject.size() <= 50
+        && data.testId is string && data.testId.size() <= 100
+        && data.totalScore is number && data.totalScore >= 0 && data.totalScore <= 150
+        && data.submittedAt == request.time;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'qzquiz50@gmail.com' ||
+        request.auth.token.email.matches('(?i)^qzquiz50@gmail\\.com$')
+      );
+    }
+
+    function isValidPromoter(data) {
+      return data.keys().hasAll(['userId', 'name', 'promoCode', 'createdAt'])
+        && (
+          data.keys().size() == 4 || 
+          (data.keys().size() == 5 && (data.keys().hasAll(['upiNumber']) || data.keys().hasAll(['withdrawnAmount']))) ||
+          (data.keys().size() == 6 && data.keys().hasAll(['upiNumber', 'withdrawnAmount']))
+        )
+        && data.userId is string && data.userId.size() <= 128
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 100
+        && data.promoCode is string && data.promoCode.size() >= 3 && data.promoCode.size() <= 20
+        && data.promoCode.matches('^[A-Z0-9]+$')
+        && (!data.keys().hasAll(['upiNumber']) || (data.upiNumber is string && data.upiNumber.size() <= 128))
+        && (!data.keys().hasAll(['withdrawnAmount']) || (data.withdrawnAmount is number && data.withdrawnAmount >= 0));
+    }
+
+    function isValidWithdrawalRequest(data) {
+      return data.keys().hasAll(['requestId', 'promoterId', 'promoterName', 'amount', 'upiNumber', 'status', 'createdAt'])
+        && data.keys().size() == 7
+        && data.requestId is string && data.requestId.size() <= 128
+        && data.promoterId == request.auth.uid
+        && data.promoterName is string && data.promoterName.size() <= 100
+        && data.amount is number && data.amount > 0 && data.amount <= 100000
+        && data.upiNumber is string && data.upiNumber.size() <= 128
+        && data.status == 'pending'
+        && data.createdAt == request.time;
+    }
+
+    function isValidCustomMockTest(data) {
+      return data.keys().hasAll(['title', 'vargId', 'subject', 'time', 'questionsCount', 'price', 'isFree', 'questions', 'createdAt'])
+        && (data.keys().size() == 9 || data.keys().size() == 11 || data.keys().size() == 12)
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 200
+        && data.vargId in ['varg1', 'varg2', 'varg3', 'gk']
+        && data.subject is string && data.subject.size() <= 100
+        && data.time is number && data.time > 0 && data.time <= 1000
+        && data.questionsCount is number && data.questionsCount > 0 && data.questionsCount <= 1000
+        && data.price is number && data.price >= 0 && data.price <= 10000
+        && data.isFree is bool
+        && data.questions is string && data.questions.size() <= 1048576
+        && (!data.keys().hasAll(['totalSeats']) || (data.totalSeats is number && data.totalSeats >= 1))
+        && (!data.keys().hasAll(['joinedCount']) || (data.joinedCount is number && data.joinedCount >= 0))
+        && (!data.keys().hasAll(['scheduledLiveTime']) || (data.scheduledLiveTime == null || data.scheduledLiveTime is string))
+        && (data.createdAt == request.time || data.createdAt == resource.data.createdAt);
+    }
+
+    // 4. Collection Rules
+    match /UserPurchases/{purchaseId} {
+      // Users can see their own purchases, check registration counts, and promoters can see referrals they brought
+      allow list, get: if isSignedIn();
+      
+      // Users can create a purchase record only for themselves
+      allow create: if isSignedIn() 
+        && isValidId(purchaseId)
+        && isValidPurchase(request.resource.data);
+      
+      // Purchases are immutable
+      allow update, delete: if false;
+    }
+
+    match /Promoters/{promoterUserId} {
+      // Authenticated users can list/get to verify promo-codes
+      allow list: if isSignedIn();
+      allow get: if isSignedIn();
+
+      // Only the authenticated user can register their promoter account
+      allow create: if isSignedIn()
+        && isOwner(promoterUserId)
+        && isValidId(promoterUserId)
+        && isValidPromoter(request.resource.data)
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+
+      allow update: if isSignedIn() && (
+        isAdmin() || (
+          isOwner(promoterUserId) 
+          && isValidPromoter(request.resource.data)
+          && request.resource.data.userId == resource.data.userId
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.promoCode == resource.data.promoCode
+        )
+      );
+      allow delete: if false;
+    }
+
+    match /WithdrawalRequests/{requestId} {
+      // Promoters can list/get their own requests; Admin can see all
+      allow list: if isSignedIn() && (resource.data.promoterId == request.auth.uid || isAdmin());
+      allow get: if isSignedIn() && (resource.data.promoterId == request.auth.uid || isAdmin());
+      
+      // Registered promoters can create requests
+      allow create: if isSignedIn()
+        && isValidId(requestId)
+        && isValidWithdrawalRequest(request.resource.data);
+
+      // Only admin can approve or update a request
+      allow update: if isSignedIn() && isAdmin();
+      allow delete: if false;
+    }
+
+    match /Leaderboards/{entryId} {
+      // Anyone can see leaderboard entries (to see ranks)
+      allow list: if isSignedIn();
+      allow get: if isSignedIn();
+
+      // Users can create or update their own result entries
+      allow create: if isSignedIn()
+        && isValidId(entryId)
+        && isValidLeaderboardEntry(request.resource.data);
+      
+      allow update: if isSignedIn()
+        && isOwner(resource.data.userId)
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.testId == resource.data.testId;
+
+      allow delete: if false;
+    }
+
+    match /Settings/{settingId} {
+      allow list, get: if isSignedIn();
+      allow create, update: if isSignedIn() && isAdmin() && isValidPlatformSettings(request.resource.data);
+      allow delete: if false;
+    }
+
+    match /CustomMockTests/{testId} {
+      allow list, get: if isSignedIn();
+      allow create, update: if isSignedIn() && isAdmin() && isValidCustomMockTest(request.resource.data);
+      allow delete: if isSignedIn() && isAdmin();
+    }
+
+    // Connectivity test collection
+    match /test/connection {
+      allow read: if true;
+    }
+  }
+}

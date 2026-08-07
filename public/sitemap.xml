@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <!-- Auth / Login Portal (Main Landing Entry) -->
+  <url>
+    <loc>https://mockia.in/auth</loc>
+    <lastmod>2026-05-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.00</priority>
+  </url>
+
+  <!-- Promoter Program Page -->
+  <url>
+    <loc>https://mockia.in/promoters</loc>
+    <lastmod>2026-05-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
+  </url>
+
+  <!-- About Us -->
+  <url>
+    <loc>https://mockia.in/about-us</loc>
+    <lastmod>2026-05-26</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.60</priority>
+  </url>
+
+  <!-- Contact Us -->
+  <url>
+    <loc>https://mockia.in/contact-us</loc>
+    <lastmod>2026-05-26</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.60</priority>
+  </url>
+
+  <!-- Privacy Policy -->
+  <url>
+    <loc>https://mockia.in/privacy-policy</loc>
+    <lastmod>2026-05-26</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.40</priority>
+  </url>
+
+  <!-- Terms & Conditions -->
+  <url>
+    <loc>https://mockia.in/terms</loc>
+    <lastmod>2026-05-26</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.40</priority>
+  </url>
+
+  <!-- Refund Policy -->
+  <url>
+    <loc>https://mockia.in/refund-policy</loc>
+    <lastmod>2026-05-26</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.40</priority>
+  </url>
+</urlset>

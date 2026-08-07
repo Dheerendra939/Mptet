@@ -1,0 +1,249 @@
+{
+  "entities": {
+    "UserPurchase": {
+      "title": "User Purchase",
+      "description": "Records of tests unlocked by users via payment.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID of the user who made the purchase."
+        },
+        "testId": {
+          "type": "string",
+          "description": "Unique identifier of the test."
+        },
+        "vargId": {
+          "type": "string",
+          "description": "Category ID (varg1, varg2, varg3)."
+        },
+        "subject": {
+          "type": "string",
+          "description": "Subject key."
+        },
+        "purchasedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of purchase."
+        },
+        "paymentId": {
+          "type": "string",
+          "description": "Razorpay payment ID."
+        },
+        "promoCode": {
+          "type": "string",
+          "description": "Uppercase promo code used."
+        },
+        "amountPaid": {
+          "type": "number",
+          "description": "Amount paid in paise (500 or 1000)."
+        },
+        "promoterUserId": {
+          "type": "string",
+          "description": "UID of the referring promoter."
+        }
+      },
+      "required": ["userId", "testId", "purchasedAt"]
+    },
+    "LeaderboardEntry": {
+      "title": "Leaderboard Entry",
+      "description": "User's score for a specific test.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "userName": {
+          "type": "string"
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "Profile picture URL of the candidate."
+        },
+        "vargId": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "testId": {
+          "type": "string"
+        },
+        "totalScore": {
+          "type": "number"
+        },
+        "submittedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["userId", "userName", "photoURL", "vargId", "subject", "testId", "totalScore", "submittedAt"]
+    },
+    "Promoter": {
+      "title": "Promoter",
+      "description": "Information about registered promoters and their custom promo code.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID of the promoter."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the promoter."
+        },
+        "promoCode": {
+          "type": "string",
+          "description": "Uppercase custom alphanumeric code."
+        },
+        "upiNumber": {
+          "type": "string",
+          "description": "UPI number for receiving payments."
+        },
+        "withdrawnAmount": {
+          "type": "number",
+          "description": "Total amount approved and withdrawn."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when registered."
+        }
+      },
+      "required": ["userId", "name", "promoCode", "createdAt"]
+    },
+    "WithdrawalRequest": {
+      "title": "Withdrawal Request",
+      "description": "Withdrawal requests submitted by promoters.",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "description": "Unique request ID."
+        },
+        "promoterId": {
+          "type": "string",
+          "description": "UID of the promoter."
+        },
+        "promoterName": {
+          "type": "string",
+          "description": "Name of the promoter."
+        },
+        "amount": {
+          "type": "number",
+          "description": "Amount to withdraw in INR."
+        },
+        "upiNumber": {
+          "type": "string",
+          "description": "UPI address for transfer."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "approved", "rejected"],
+          "description": "Status of the withdrawal request."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when requested."
+        }
+      },
+      "required": ["requestId", "promoterId", "promoterName", "amount", "upiNumber", "status", "createdAt"]
+    },
+    "PlatformSettings": {
+      "title": "Platform Settings",
+      "description": "Global configuration settings for test price, promoter commission, and student discount.",
+      "type": "object",
+      "properties": {
+        "testPrice": {
+          "type": "number",
+          "description": "Standard price of a test in INR."
+        },
+        "promoterCommission": {
+          "type": "number",
+          "description": "Commission earned by promoter per sale in INR."
+        },
+        "studentDiscount": {
+          "type": "number",
+          "description": "Discount in INR offered to students using a promo code."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["testPrice", "promoterCommission", "studentDiscount"]
+    },
+    "CustomMockTest": {
+      "title": "Custom Mock Test",
+      "description": "Custom mock tests uploaded dynamically by the administrator.",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Title of the mock test."
+        },
+        "vargId": {
+          "type": "string",
+          "description": "Category/Varg ID of the test."
+        },
+        "subject": {
+          "type": "string",
+          "description": "Subject of the test."
+        },
+        "time": {
+          "type": "number",
+          "description": "Duration in minutes."
+        },
+        "questionsCount": {
+          "type": "number",
+          "description": "Number of questions."
+        },
+        "price": {
+          "type": "number",
+          "description": "Unlock price in INR, or 0 if free."
+        },
+        "isFree": {
+          "type": "boolean",
+          "description": "True if the test is completely free."
+        },
+        "questions": {
+          "type": "string",
+          "description": "JSON string representing array of question objects."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when mock was created."
+        }
+      },
+      "required": ["title", "vargId", "subject", "time", "questionsCount", "price", "isFree", "questions", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/CustomMockTests/{testId}": {
+      "schema": "CustomMockTest",
+      "description": "Collection of all uploadable or custom mock tests."
+    },
+    "/UserPurchases/{purchaseId}": {
+      "schema": "UserPurchase",
+      "description": "Collection of all test purchases."
+    },
+    "/Leaderboards/{entryId}": {
+      "schema": "LeaderboardEntry",
+      "description": "Real-time rank list for users."
+    },
+    "/Promoters/{promoterUserId}": {
+      "schema": "Promoter",
+      "description": "Registration of promotional codes and personal names."
+    },
+    "/WithdrawalRequests/{requestId}": {
+      "schema": "WithdrawalRequest",
+      "description": "Withdrawal requests submitted by promoters."
+    },
+    "/Settings/{settingId}": {
+      "schema": "PlatformSettings",
+      "description": "Global settings for pricing, commissions, and discounts."
+    }
+  }
+}

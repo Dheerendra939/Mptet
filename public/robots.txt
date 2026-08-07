@@ -1,0 +1,16 @@
+User-agent: *
+Allow: /
+Allow: /auth
+Allow: /promoters
+Allow: /about-us
+Allow: /contact-us
+Allow: /privacy-policy
+Allow: /terms
+Allow: /refund-policy
+Disallow: /dashboard*
+Disallow: /varg*
+Disallow: /result*
+
+# Sitemaps
+Sitemap: https://mockia.in/sitemap.xml
+Sitemap: https://ais-pre-fewpe5z7cpca25ouorfxxz-427970963352.asia-southeast1.run.app/sitemap.xml
