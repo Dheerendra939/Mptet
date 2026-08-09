@@ -26,16 +26,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  const loginAsDemo = () => {
-    const mockUser: any = {
-      uid: 'demo-student-guest-101',
-      email: 'guest@mockia.in',
-      displayName: 'Guest Aspirant',
-      photoURL: null,
-      isAnonymous: true,
-      emailVerified: true,
-    };
-    setDemoUser(mockUser);
+  const loginAsDemo = async () => {
+    try {
+      await signInAnonymously(auth);
+    } catch (err) {
+      console.warn('Anonymous auth unavailable, activating fallback demo session:', err);
+      const mockUser: any = {
+        uid: 'demo-student-guest-101',
+        email: 'guest@mockia.in',
+        displayName: 'Guest Aspirant',
+        photoURL: null,
+        isAnonymous: true,
+        emailVerified: true,
+      };
+      setDemoUser(mockUser);
+    }
   };
 
   const logout = async () => {

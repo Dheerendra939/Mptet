@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { initializeFirestore, memoryLocalCache, doc, getDocFromServer } from 'firebase/firestore';
+import { initializeFirestore, memoryLocalCache, doc, getDoc } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
@@ -65,9 +65,9 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 // Non-blocking connectivity check based on integration guidelines
 async function testConnection() {
   try {
-    // Attempting to fetch a doc to verify backend reachability
-    await getDocFromServer(doc(db, 'test', 'connection'));
-    console.log("Firestore connection successful: Reached the backend.");
+    // Attempting to fetch a doc using local cache / server gracefully
+    await getDoc(doc(db, 'test', 'connection'));
+    console.log("Firestore connection check initialized.");
   } catch (error) {
     if (error instanceof Error) {
       if (error.message.includes('the client is offline') || error.message.includes('Could not reach Cloud Firestore backend')) {
@@ -79,4 +79,5 @@ async function testConnection() {
   }
 }
 testConnection();
+
 

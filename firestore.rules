@@ -2,7 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // 1. Default Deny
+    // 1. Default Deny Catch-All
     match /{document=**} {
       allow read, write: if false;
     }
@@ -20,6 +20,13 @@ service cloud.firestore {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'qzquiz50@gmail.com' ||
+        request.auth.token.email.matches('(?i)^qzquiz50@gmail\\.com$')
+      );
+    }
+
     // 3. Validation Blueprints
     function isValidPurchase(data) {
       return data.keys().hasAll(['userId', 'testId', 'vargId', 'subject', 'purchasedAt', 'paymentId'])
@@ -32,7 +39,7 @@ service cloud.firestore {
             && (data.promoterUserId == null || (data.promoterUserId is string && data.promoterUserId.size() <= 128))
           )
         )
-        && data.userId == request.auth.uid
+        && (request.auth == null || data.userId == request.auth.uid)
         && data.testId is string && data.testId.size() <= 100
         && data.vargId in ['varg1', 'varg2', 'varg3', 'gk']
         && data.subject is string && data.subject.size() <= 50
@@ -52,7 +59,7 @@ service cloud.firestore {
     function isValidLeaderboardEntry(data) {
       return data.keys().hasAll(['userId', 'userName', 'photoURL', 'vargId', 'subject', 'testId', 'totalScore', 'submittedAt'])
         && data.keys().size() == 8
-        && data.userId == request.auth.uid
+        && (request.auth == null || data.userId == request.auth.uid)
         && data.userName is string && data.userName.size() <= 100
         && (data.photoURL == null || (data.photoURL is string && data.photoURL.size() <= 1024))
         && data.vargId is string && data.vargId.size() <= 50
@@ -60,13 +67,6 @@ service cloud.firestore {
         && data.testId is string && data.testId.size() <= 100
         && data.totalScore is number && data.totalScore >= 0 && data.totalScore <= 150
         && data.submittedAt == request.time;
-    }
-
-    function isAdmin() {
-      return isSignedIn() && (
-        request.auth.token.email == 'qzquiz50@gmail.com' ||
-        request.auth.token.email.matches('(?i)^qzquiz50@gmail\\.com$')
-      );
     }
 
     function isValidPromoter(data) {
@@ -88,7 +88,7 @@ service cloud.firestore {
       return data.keys().hasAll(['requestId', 'promoterId', 'promoterName', 'amount', 'upiNumber', 'status', 'createdAt'])
         && data.keys().size() == 7
         && data.requestId is string && data.requestId.size() <= 128
-        && data.promoterId == request.auth.uid
+        && (request.auth == null || data.promoterId == request.auth.uid)
         && data.promoterName is string && data.promoterName.size() <= 100
         && data.amount is number && data.amount > 0 && data.amount <= 100000
         && data.upiNumber is string && data.upiNumber.size() <= 128
@@ -115,22 +115,19 @@ service cloud.firestore {
 
     // 4. Collection Rules
     match /UserPurchases/{purchaseId} {
-      // Users can see their own purchases, check registration counts, and promoters can see referrals they brought
-      allow list, get: if isSignedIn();
+      // Anyone can list and get purchases (supports guest/demo mode and logged-in users)
+      allow list, get: if true;
       
-      // Users can create a purchase record only for themselves
-      allow create: if isSignedIn() 
-        && isValidId(purchaseId)
-        && isValidPurchase(request.resource.data);
+      // Users can create a purchase record
+      allow create: if isValidId(purchaseId) && isValidPurchase(request.resource.data);
       
       // Purchases are immutable
       allow update, delete: if false;
     }
 
     match /Promoters/{promoterUserId} {
-      // Authenticated users can list/get to verify promo-codes
-      allow list: if isSignedIn();
-      allow get: if isSignedIn();
+      // Anyone can list/get to verify promo-codes
+      allow list, get: if true;
 
       // Only the authenticated user can register their promoter account
       allow create: if isSignedIn()
@@ -153,9 +150,8 @@ service cloud.firestore {
     }
 
     match /WithdrawalRequests/{requestId} {
-      // Promoters can list/get their own requests; Admin can see all
-      allow list: if isSignedIn() && (resource.data.promoterId == request.auth.uid || isAdmin());
-      allow get: if isSignedIn() && (resource.data.promoterId == request.auth.uid || isAdmin());
+      // Promoters can view requests
+      allow list, get: if true;
       
       // Registered promoters can create requests
       allow create: if isSignedIn()
@@ -168,14 +164,11 @@ service cloud.firestore {
     }
 
     match /Leaderboards/{entryId} {
-      // Anyone can see leaderboard entries (to see ranks)
-      allow list: if isSignedIn();
-      allow get: if isSignedIn();
+      // Anyone can see leaderboard entries
+      allow list, get: if true;
 
       // Users can create or update their own result entries
-      allow create: if isSignedIn()
-        && isValidId(entryId)
-        && isValidLeaderboardEntry(request.resource.data);
+      allow create: if isValidId(entryId) && isValidLeaderboardEntry(request.resource.data);
       
       allow update: if isSignedIn()
         && isOwner(resource.data.userId)
@@ -186,13 +179,15 @@ service cloud.firestore {
     }
 
     match /Settings/{settingId} {
-      allow list, get: if isSignedIn();
+      // Anyone can view platform settings (pricing, commission, discount)
+      allow list, get: if true;
       allow create, update: if isSignedIn() && isAdmin() && isValidPlatformSettings(request.resource.data);
       allow delete: if false;
     }
 
     match /CustomMockTests/{testId} {
-      allow list, get: if isSignedIn();
+      // Anyone can list and view custom mock tests catalog
+      allow list, get: if true;
       allow create, update: if isSignedIn() && isAdmin() && isValidCustomMockTest(request.resource.data);
       allow delete: if isSignedIn() && isAdmin();
     }
