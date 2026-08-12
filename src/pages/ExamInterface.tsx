@@ -6,7 +6,7 @@ import { cn } from '../lib/utils';
 import { collection, serverTimestamp, doc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
-import { generateFullMockTest } from '../data/mockQuestions';
+import { generateFullMockTest, attachPartATo120Paper } from '../data/mockQuestions';
 import { Question, QuestionStatus } from '../types';
 
 export default function ExamInterface() {
@@ -84,6 +84,10 @@ export default function ExamInterface() {
           } else {
             durationSeconds = 150 * 60;
           }
+        }
+
+        if (loadedQuestions.length === 120) {
+          loadedQuestions = attachPartATo120Paper(loadedQuestions);
         }
 
         setQuestions(loadedQuestions);

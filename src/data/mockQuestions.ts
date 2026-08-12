@@ -545,10 +545,10 @@ export function generateFullMockTest(vargId: string, subject: string, testId?: s
 
   if (vargId === 'varg2') {
     if (subject && (subject.toLowerCase() === 'mathematics' || subject.toLowerCase() === 'maths' || subject.toLowerCase() === 'गणित')) {
-      return VARG2_MATHS_120_QUESTIONS;
+      return attachPartATo120Paper(VARG2_MATHS_120_QUESTIONS, 'गणित');
     }
     if (subject && (subject.toLowerCase().includes('social') || subject.toLowerCase().includes('सामाजिक') || subject.toLowerCase() === 'sst')) {
-      return VARG2_SOCIAL_SCIENCE_120_QUESTIONS;
+      return attachPartATo120Paper(VARG2_SOCIAL_SCIENCE_120_QUESTIONS, 'सामाजिक विज्ञान');
     }
   }
 
@@ -560,24 +560,66 @@ export function generateFullMockTest(vargId: string, subject: string, testId?: s
     createSet('EVS', 30, BASE_QUESTIONS.Evs || [], 'evs');
   } else {
     // Varg 1 & 2
-    // Use actual Part A
-    for (const q of PART_A_COMMON) {
-      const text = q.questionText || `Part A Question ${currentId}`;
+    // Use actual Part A (30 Common Questions)
+    PART_A_COMMON.forEach((q, index) => {
+      let sectionTitle = "भाग-अ: (iv) शिक्षाशास्त्र (Pedagogy)";
+      if (index < 8) sectionTitle = "भाग-अ: (i) सामान्य हिंदी";
+      else if (index < 13) sectionTitle = "भाग-अ: (ii) सामान्य अंग्रेजी";
+      else if (index < 20) sectionTitle = "भाग-अ: (iii) सामान्य ज्ञान व तार्किक योग्यता";
+
+      const text = q.questionText || `Part A Question ${index + 1}`;
       seenTexts.add(text);
       fullSet.push({
         id: currentId++,
-        section: `Part A: ${q.section}`,
+        section: sectionTitle,
         questionText: text,
         options: q.options || ["A", "B", "C", "D"],
         correctAnswer: q.correctAnswer || "A"
       } as Question);
-    }
+    });
     
-    // Add Part B based on subject
+    // Add Part B based on subject (120 questions)
     const subjectKey = subject.charAt(0).toUpperCase() + subject.slice(1).toLowerCase();
     const subjectTemplates = BASE_QUESTIONS[subjectKey] || BASE_QUESTIONS[subject] || [];
-    createSet(`Part B: ${subject.toUpperCase()}`, 120, subjectTemplates, subjectKey);
+    createSet(`भाग-ब: मुख्य विषय (${subject.toUpperCase()})`, 120, subjectTemplates, subjectKey);
   }
 
   return fullSet;
+}
+
+export function attachPartATo120Paper(partBQuestions: Question[], subjectName?: string): Question[] {
+  const result: Question[] = [];
+
+  // Part A: 30 Common Questions (Q1 to Q30)
+  PART_A_COMMON.forEach((q, index) => {
+    let sectionTitle = "भाग-अ: (iv) शिक्षाशास्त्र (Pedagogy)";
+    if (index < 8) sectionTitle = "भाग-अ: (i) सामान्य हिंदी";
+    else if (index < 13) sectionTitle = "भाग-अ: (ii) सामान्य अंग्रेजी";
+    else if (index < 20) sectionTitle = "भाग-अ: (iii) सामान्य ज्ञान, समसामयिक घटनाक्रम, तार्किक व आंकिक योग्यता";
+
+    result.push({
+      id: index + 1,
+      section: sectionTitle,
+      questionText: q.questionText || '',
+      options: q.options || [],
+      correctAnswer: q.correctAnswer || ''
+    });
+  });
+
+  // Part B: 120 Subject Questions (Q31 to Q150)
+  partBQuestions.forEach((q, index) => {
+    let originalSec = q.section || (subjectName ? `मुख्य विषय (${subjectName})` : "मुख्य विषय");
+    if (!originalSec.startsWith("भाग-ब")) {
+      originalSec = `भाग-ब: ${originalSec}`;
+    }
+    result.push({
+      id: 30 + index + 1,
+      section: originalSec,
+      questionText: q.questionText,
+      options: q.options,
+      correctAnswer: q.correctAnswer
+    });
+  });
+
+  return result;
 }
