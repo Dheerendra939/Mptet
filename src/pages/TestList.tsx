@@ -41,7 +41,7 @@ export default function TestList() {
           });
         }
       } catch (err) {
-        console.error('Error fetching platform settings:', err);
+        console.warn('Using default platform settings due to network/cache state.');
       }
     }
     fetchPlatformSettings();

@@ -68,7 +68,7 @@ export default function PromoterPanel() {
           });
         }
       } catch (err) {
-        console.error('Error fetching platform settings:', err);
+        console.warn('Using default platform settings due to network/cache state.');
       }
 
       if (!user) {

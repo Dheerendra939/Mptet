@@ -1,4 +1,12 @@
 import { Question } from '../types';
+import { VARG1_HINDI_150_QUESTIONS } from './varg1HindiFullPaper';
+import { VARG1_ENGLISH_150_QUESTIONS } from './varg1EnglishFullPaper';
+import { VARG1_SANSKRIT_150_QUESTIONS } from './varg1SanskritFullPaper';
+import { VARG1_MATHS_150_QUESTIONS } from './varg1MathsFullPaper';
+import { VARG1_PHYSICS_150_QUESTIONS } from './varg1PhysicsFullPaper';
+import { VARG1_CHEMISTRY_150_QUESTIONS } from './varg1ChemistryFullPaper';
+import { VARG2_MATHS_120_QUESTIONS } from './varg2MathsFullPaper';
+import { VARG2_SOCIAL_SCIENCE_120_QUESTIONS } from './varg2SocialScienceFullPaper';
 
 export const BASE_QUESTIONS: Record<string, Partial<Question>[]> = {
   CDP: [
@@ -512,6 +520,36 @@ export function generateFullMockTest(vargId: string, subject: string, testId?: s
   if (vargId === 'gk' || subject === 'gk' || vargId === 'gk_test') {
     createSet('GK', 20, BASE_QUESTIONS.GK || [], 'gk');
     return fullSet;
+  }
+
+  if (vargId === 'varg1') {
+    if (subject && subject.toLowerCase() === 'english') {
+      return VARG1_ENGLISH_150_QUESTIONS;
+    }
+    if (subject && subject.toLowerCase() === 'sanskrit') {
+      return VARG1_SANSKRIT_150_QUESTIONS;
+    }
+    if (subject && (subject.toLowerCase() === 'mathematics' || subject.toLowerCase() === 'maths')) {
+      return VARG1_MATHS_150_QUESTIONS;
+    }
+    if (subject && (subject.toLowerCase() === 'physics' || subject.toLowerCase() === 'भौतिक विज्ञान')) {
+      return VARG1_PHYSICS_150_QUESTIONS;
+    }
+    if (subject && (subject.toLowerCase() === 'chemistry' || subject.toLowerCase() === 'रसायन विज्ञान' || subject.toLowerCase() === 'chem')) {
+      return VARG1_CHEMISTRY_150_QUESTIONS;
+    }
+    if (!subject || subject.toLowerCase() === 'hindi' || subject === 'general') {
+      return VARG1_HINDI_150_QUESTIONS;
+    }
+  }
+
+  if (vargId === 'varg2') {
+    if (subject && (subject.toLowerCase() === 'mathematics' || subject.toLowerCase() === 'maths' || subject.toLowerCase() === 'गणित')) {
+      return VARG2_MATHS_120_QUESTIONS;
+    }
+    if (subject && (subject.toLowerCase().includes('social') || subject.toLowerCase().includes('सामाजिक') || subject.toLowerCase() === 'sst')) {
+      return VARG2_SOCIAL_SCIENCE_120_QUESTIONS;
+    }
   }
 
   if (vargId === 'varg3') {

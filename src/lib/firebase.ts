@@ -1,12 +1,11 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { initializeFirestore, memoryLocalCache, doc, getDoc } from 'firebase/firestore';
+import { initializeFirestore, memoryLocalCache } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firestore with memory cache to avoid IndexedDB issues in sandboxed iframes
-// and force long polling to bypass WebSocket restrictions & 10s connection timeouts.
+// Initialize Firestore with memory cache and force long polling to bypass WebSocket restrictions in AI Studio containers.
 const dbId = firebaseConfig.firestoreDatabaseId;
 export const db = initializeFirestore(app, {
   localCache: memoryLocalCache(),
@@ -61,23 +60,5 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   console.error('Firestore Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
 }
-
-// Non-blocking connectivity check based on integration guidelines
-async function testConnection() {
-  try {
-    // Attempting to fetch a doc using local cache / server gracefully
-    await getDoc(doc(db, 'test', 'connection'));
-    console.log("Firestore connection check initialized.");
-  } catch (error) {
-    if (error instanceof Error) {
-      if (error.message.includes('the client is offline') || error.message.includes('Could not reach Cloud Firestore backend')) {
-        console.warn("Firestore status: Client operating in offline mode or backend unreachable. Local cache will be utilized.");
-      } else {
-        console.warn("Firestore connectivity check info:", error.message);
-      }
-    }
-  }
-}
-testConnection();
 
 
