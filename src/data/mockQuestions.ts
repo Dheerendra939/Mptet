@@ -7,6 +7,11 @@ import { VARG1_PHYSICS_150_QUESTIONS } from './varg1PhysicsFullPaper';
 import { VARG1_CHEMISTRY_150_QUESTIONS } from './varg1ChemistryFullPaper';
 import { VARG2_MATHS_120_QUESTIONS } from './varg2MathsFullPaper';
 import { VARG2_SOCIAL_SCIENCE_120_QUESTIONS } from './varg2SocialScienceFullPaper';
+import { VARG2_ENGLISH_120_QUESTIONS } from './varg2EnglishFullPaper';
+import { VARG2_HINDI_120_QUESTIONS } from './varg2HindiFullPaper';
+import { VARG2_SCIENCE_120_QUESTIONS } from './varg2ScienceFullPaper';
+import { VARG2_SANSKRIT_120_QUESTIONS } from './varg2SanskritFullPaper';
+import { VARG3_FULL_PAPER_150_QUESTIONS } from './varg3FullPaper';
 
 export const BASE_QUESTIONS: Record<string, Partial<Question>[]> = {
   CDP: [
@@ -550,14 +555,22 @@ export function generateFullMockTest(vargId: string, subject: string, testId?: s
     if (subject && (subject.toLowerCase().includes('social') || subject.toLowerCase().includes('सामाजिक') || subject.toLowerCase() === 'sst')) {
       return attachPartATo120Paper(VARG2_SOCIAL_SCIENCE_120_QUESTIONS, 'सामाजिक विज्ञान');
     }
+    if (subject && (subject.toLowerCase() === 'english' || subject.toLowerCase() === 'अंग्रेजी' || subject.toLowerCase().includes('english'))) {
+      return attachPartATo120Paper(VARG2_ENGLISH_120_QUESTIONS, 'अंग्रेजी (English Literature & Language)');
+    }
+    if (subject && (subject.toLowerCase() === 'hindi' || subject.toLowerCase() === 'हिन्दी' || subject.toLowerCase() === 'हिंदी' || subject.toLowerCase().includes('hindi') || subject.toLowerCase().includes('हिंदी'))) {
+      return attachPartATo120Paper(VARG2_HINDI_120_QUESTIONS, 'हिंदी (Hindi Literature & Language)');
+    }
+    if (subject && (subject.toLowerCase() === 'science' || subject.toLowerCase() === 'विज्ञान' || subject.toLowerCase().includes('science') || subject.toLowerCase().includes('विज्ञान'))) {
+      return attachPartATo120Paper(VARG2_SCIENCE_120_QUESTIONS, 'विज्ञान (Science)');
+    }
+    if (subject && (subject.toLowerCase() === 'sanskrit' || subject.toLowerCase() === 'संस्कृत' || subject.toLowerCase().includes('sanskrit') || subject.toLowerCase().includes('संस्कृत'))) {
+      return attachPartATo120Paper(VARG2_SANSKRIT_120_QUESTIONS, 'संस्कृत (Sanskrit Literature & Language)');
+    }
   }
 
   if (vargId === 'varg3') {
-    createSet('CDP', 30, BASE_QUESTIONS.CDP || [], 'cdp');
-    createSet('Language 1 (Hindi)', 30, BASE_QUESTIONS.Hindi || [], 'hindi');
-    createSet('Language 2 (English)', 30, BASE_QUESTIONS.English || [], 'english');
-    createSet('Maths', 30, BASE_QUESTIONS.Mathematics || [], 'maths');
-    createSet('EVS', 30, BASE_QUESTIONS.Evs || [], 'evs');
+    return VARG3_FULL_PAPER_150_QUESTIONS;
   } else {
     // Varg 1 & 2
     // Use actual Part A (30 Common Questions)

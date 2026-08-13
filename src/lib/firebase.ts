@@ -5,7 +5,7 @@ import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firestore with memory cache and force long polling to bypass WebSocket restrictions in AI Studio containers.
+// Initialize Firestore with memory cache and force long polling to avoid 10s stream timeouts in sandbox containers.
 const dbId = firebaseConfig.firestoreDatabaseId;
 export const db = initializeFirestore(app, {
   localCache: memoryLocalCache(),
