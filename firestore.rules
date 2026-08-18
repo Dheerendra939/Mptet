@@ -60,12 +60,13 @@ service cloud.firestore {
       return data.keys().hasAll(['userId', 'userName', 'photoURL', 'vargId', 'subject', 'testId', 'totalScore', 'submittedAt'])
         && data.keys().size() == 8
         && (request.auth == null || data.userId == request.auth.uid)
+        && data.userId is string && data.userId.size() <= 128
         && data.userName is string && data.userName.size() <= 100
         && (data.photoURL == null || (data.photoURL is string && data.photoURL.size() <= 1024))
         && data.vargId is string && data.vargId.size() <= 50
         && data.subject is string && data.subject.size() <= 50
         && data.testId is string && data.testId.size() <= 100
-        && data.totalScore is number && data.totalScore >= 0 && data.totalScore <= 150
+        && data.totalScore is number && data.totalScore >= 0 && data.totalScore <= 500
         && data.submittedAt == request.time;
     }
 
@@ -170,8 +171,9 @@ service cloud.firestore {
       // Users can create or update their own result entries
       allow create: if isValidId(entryId) && isValidLeaderboardEntry(request.resource.data);
       
-      allow update: if isSignedIn()
-        && isOwner(resource.data.userId)
+      allow update: if isValidId(entryId)
+        && (request.auth == null || request.resource.data.userId == request.auth.uid)
+        && isValidLeaderboardEntry(request.resource.data)
         && request.resource.data.userId == resource.data.userId
         && request.resource.data.testId == resource.data.testId;
 

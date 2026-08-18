@@ -69,7 +69,20 @@ export default function ResultPage() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const { score: stateScore, vargId, subject, testId, totalQuestions = 150, submissionId } = state || { score: null, vargId: 'unknown', subject: 'general', testId: 'unknown', totalQuestions: 150, submissionId: null };
+  // Fallback to locally cached result if user refreshed or navigated directly
+  let cachedResult: any = null;
+  try {
+    const raw = localStorage.getItem('mockia_last_result');
+    if (raw) cachedResult = JSON.parse(raw);
+  } catch {}
+
+  const stateData = state || cachedResult || {};
+  const stateScore = stateData.score ?? null;
+  const vargId = stateData.vargId || 'unknown';
+  const subject = stateData.subject || 'general';
+  const testId = stateData.testId || 'unknown';
+  const totalQuestions = Number(stateData.totalQuestions) || 150;
+  const submissionId = stateData.submissionId || null;
 
   useEffect(() => {
     if (!vargId || !subject || !testId) return;

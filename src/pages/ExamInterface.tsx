@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChevronLeft, ChevronRight, Bookmark, Send, Clock, AlertCircle, RefreshCw, Eye, EyeOff, LayoutDashboard, Layout } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, getSafeEntryId } from '../lib/utils';
 import { collection, serverTimestamp, doc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
@@ -28,24 +28,26 @@ export default function ExamInterface() {
   // Security Check & Data Initialization
   useEffect(() => {
     async function initializeTest() {
-      if (!user || !vargId) return;
+      if (!vargId) return;
       
       setVerifying(true);
       
-      // 0. Unique attempt lock verification
-      const entryId = `${user?.uid}_${vargId || 'unknown'}_${subject || 'general'}_${testId || 'unknown'}`;
-      const isAdmin = user?.email === 'qzquiz50@gmail.com';
-      try {
-        if (!isAdmin) {
-          const leaderSnap = await getDoc(doc(db, 'Leaderboards', entryId));
-          if (leaderSnap.exists()) {
-            setAlreadyAttempted(true);
-            setVerifying(false);
-            return;
+      // 0. Unique attempt lock verification (for logged in users)
+      if (user) {
+        const entryId = getSafeEntryId(user.uid, vargId, subject, testId);
+        const isAdmin = user.email === 'qzquiz50@gmail.com';
+        try {
+          if (!isAdmin) {
+            const leaderSnap = await getDoc(doc(db, 'Leaderboards', entryId));
+            if (leaderSnap.exists()) {
+              setAlreadyAttempted(true);
+              setVerifying(false);
+              return;
+            }
           }
+        } catch (err) {
+          console.warn('Leaderboard check error:', err);
         }
-      } catch (err) {
-        console.warn('Leaderboard check error:', err);
       }
 
       try {
@@ -203,17 +205,42 @@ export default function ExamInterface() {
         }
       });
 
+      // Get or create persistent user ID (handles guests and authenticated users)
+      let currentUid = user?.uid;
+      if (!currentUid) {
+        try {
+          currentUid = localStorage.getItem('mockia_guest_uid') || `guest_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+          localStorage.setItem('mockia_guest_uid', currentUid);
+        } catch {
+          currentUid = `guest_${Date.now()}`;
+        }
+      }
+
+      const entryId = getSafeEntryId(currentUid, vargId, subject, testId);
+      
+      // 1. Always cache submission locally first for 100% offline resilience
       try {
-        // Deterministic ID to ensure one entry per user per test
-        const entryId = `${user?.uid}_${vargId || 'unknown'}_${subject || 'general'}_${testId || 'unknown'}`;
-        
-        // Fetch existing attempt first to see if we should update or keep the highest score
+        localStorage.setItem('mockia_last_result', JSON.stringify({
+          submissionId: entryId,
+          score,
+          vargId: vargId || 'unknown',
+          subject: subject || 'general',
+          testId: testId || 'unknown',
+          totalQuestions: questions.length,
+          timestamp: new Date().toISOString(),
+        }));
+      } catch (storageErr) {
+        console.warn('Could not cache result locally:', storageErr);
+      }
+
+      // 2. Attempt cloud leaderboard sync in Firestore with timeout safety
+      try {
         let finalScore = score;
         try {
           const docSnap = await getDoc(doc(db, 'Leaderboards', entryId));
           if (docSnap.exists()) {
             const existingData = docSnap.data();
-            const existingScore = existingData?.totalScore || 0;
+            const existingScore = typeof existingData?.totalScore === 'number' ? existingData.totalScore : 0;
             if (existingScore > score) {
               finalScore = existingScore;
             }
@@ -222,34 +249,35 @@ export default function ExamInterface() {
           console.warn("Could not check existing leaderboard score:", e);
         }
 
-        // Save/Update to Leaderboards
-        await setDoc(doc(db, 'Leaderboards', entryId), {
-          userId: user?.uid,
-          userName: user?.displayName || user?.email?.split('@')[0] || 'Anonymous',
+        const payload = {
+          userId: String(currentUid).substring(0, 120),
+          userName: (user?.displayName || user?.email?.split('@')[0] || 'Aspirant').substring(0, 80),
           photoURL: user?.photoURL || null,
-          vargId: vargId || 'unknown',
+          vargId: String(vargId || 'unknown').substring(0, 40),
+          subject: String(subject || 'general').substring(0, 40),
+          testId: String(testId || 'unknown').substring(0, 60),
+          totalScore: Math.max(0, finalScore),
+          submittedAt: serverTimestamp(),
+        };
+
+        const savePromise = setDoc(doc(db, 'Leaderboards', entryId), payload);
+        const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 4000));
+        await Promise.race([savePromise, timeoutPromise]);
+      } catch (error) {
+        console.warn('Online sync note (will proceed to result smoothly):', error);
+      }
+
+      // 3. Always smoothly navigate to result page
+      navigate('/result', { 
+        state: { 
+          submissionId: entryId,
+          score, 
+          vargId: vargId || 'unknown', 
           subject: subject || 'general',
           testId: testId || 'unknown',
-          totalScore: finalScore,
-          submittedAt: serverTimestamp(),
-        });
-
-        // Navigate to result page with data
-        navigate('/result', { 
-          state: { 
-            submissionId: entryId,
-            score, 
-            vargId, 
-            subject: subject || 'general',
-            testId: testId || 'unknown',
-            totalQuestions: questions.length 
-          } 
-        });
-      } catch (error) {
-        console.error('Error saving result:', error);
-        alert('Failed to save result. Please check your internet connection.');
-        setIsSubmitting(false);
-      }
+          totalQuestions: questions.length 
+        } 
+      });
     } else {
       setShowConfirmSubmit(true);
     }
@@ -596,16 +624,25 @@ export default function ExamInterface() {
                   </div>
                   <div className="flex gap-3 pt-2">
                     <button 
+                      disabled={isSubmitting}
                       onClick={() => setShowConfirmSubmit(false)}
-                      className="flex-1 py-2.5 text-slate-600 font-bold text-xs uppercase tracking-widest hover:bg-slate-50 rounded-lg transition-colors border border-slate-200"
+                      className="flex-1 py-2.5 text-slate-600 font-bold text-xs uppercase tracking-widest hover:bg-slate-50 rounded-lg transition-colors border border-slate-200 disabled:opacity-50"
                     >
-                      Doubtful
+                      Cancel / Review
                     </button>
                     <button 
+                      disabled={isSubmitting}
                       onClick={() => handleSubmit(true)}
-                      className="flex-1 py-2.5 bg-red-600 text-white font-bold text-xs uppercase tracking-widest hover:bg-red-700 rounded-lg transition-all shadow-lg shadow-red-100"
+                      className="flex-1 py-2.5 bg-red-600 text-white font-bold text-xs uppercase tracking-widest hover:bg-red-700 rounded-lg transition-all shadow-lg shadow-red-100 disabled:opacity-50 flex items-center justify-center gap-2"
                     >
-                      Yes, Submit
+                      {isSubmitting ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          Submitting...
+                        </>
+                      ) : (
+                        'Yes, Submit'
+                      )}
                     </button>
                   </div>
                 </motion.div>
