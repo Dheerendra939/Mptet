@@ -174,13 +174,14 @@ export default function CreateMock() {
       }
 
       const parsed = JSON.parse(questionsJson);
+      const finalQuestionsCount = Math.max(1, Math.floor(Number(questionsCount)) || parsed.length);
       
       const payload: Record<string, any> = {
         title: title.trim(),
         vargId,
         subject: subject.toLowerCase(),
         time: Math.max(1, Math.floor(Number(time)) || 20),
-        questionsCount: parsed.length,
+        questionsCount: finalQuestionsCount,
         price: isFree ? 0 : Math.max(0, Math.floor(Number(price)) || 30),
         isFree: Boolean(isFree),
         questions: JSON.stringify(parsed),
@@ -352,18 +353,24 @@ export default function CreateMock() {
                   />
                 </div>
 
-                {/* Question Count Display */}
+                {/* Question Count Input */}
                 <div className="col-span-12 sm:col-span-6 space-y-1.5">
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider" htmlFor="input-questions-count">
-                    Questions Found / प्रश्न संख्या (डिटेक्टेड)
+                    Questions Count / प्रश्नों की कुल संख्या *
                   </label>
                   <input
                     id="input-questions-count"
-                    type="text"
-                    value={`${questionsCount} Questions`}
-                    className="w-full px-4 py-3 bg-slate-100 border border-slate-200 text-slate-700 font-black rounded-xl text-sm"
-                    readOnly
+                    type="number"
+                    min="1"
+                    max="1000"
+                    value={questionsCount}
+                    onChange={(e) => setQuestionsCount(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-none transition-all"
+                    required
                   />
+                  <p className="text-[10px] text-slate-400 font-medium">
+                    (JSON लोड होने पर अपने आप सेट होगा, या आप सीधे बदल सकते हैं)
+                  </p>
                 </div>
 
                 {/* Unlock Pricing Field */}

@@ -1,6 +1,6 @@
 {
-  "name": "Mockia.in - Exam Prep Platform",
-  "description": "Mockia.in is a modern, responsive mock test platform for competitive exams like MPTET, providing secure authentication and an advanced educational dashboard.",
+  "name": "Mockia",
+  "description": "Mockia is a modern, responsive mock test platform for competitive exams like MPTET, providing secure authentication and an advanced educational dashboard.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

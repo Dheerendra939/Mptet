@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Trophy, Medal, Users, ChevronLeft, LayoutDashboard, Share2, Download } from 'lucide-react';
-import { collection, query, where, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import { Trophy, Medal, Users, ChevronLeft, LayoutDashboard, Share2, Download, Key, BookOpen } from 'lucide-react';
+import { collection, query, where, orderBy, limit, onSnapshot, getDoc, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
+import AnswerKeyModal from '../components/AnswerKeyModal';
+import { generateFullMockTest, attachPartATo120Paper } from '../data/mockQuestions';
+import { Question } from '../types';
 import { cn } from '../lib/utils';
 
 interface LeaderboardEntry {
@@ -83,6 +86,52 @@ export default function ResultPage() {
   const testId = stateData.testId || 'unknown';
   const totalQuestions = Number(stateData.totalQuestions) || 150;
   const submissionId = stateData.submissionId || null;
+
+  // Answer Key State & Questions
+  const [questions, setQuestions] = useState<Question[]>(stateData.questions || []);
+  const [userAnswers, setUserAnswers] = useState<Record<string | number, string>>(stateData.answers || {});
+  const [showAnswerKey, setShowAnswerKey] = useState<boolean>(false);
+  const [loadingQuestions, setLoadingQuestions] = useState<boolean>(false);
+
+  // Pre-load or fetch questions for Answer Key
+  const openAnswerKey = async () => {
+    setShowAnswerKey(true);
+    if (questions.length === 0 && vargId && testId) {
+      setLoadingQuestions(true);
+      try {
+        let loadedQuestions: Question[] = [];
+        if (testId && testId !== '1' && testId !== 'unknown') {
+          const docRef = doc(db, 'CustomMockTests', testId);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const testData = docSnap.data();
+            const parsed = JSON.parse(testData.questions);
+            loadedQuestions = parsed.map((q: any, idx: number) => ({
+              id: idx + 1,
+              section: q.section || 'General',
+              questionText: q.questionText,
+              options: q.options,
+              correctAnswer: q.correctAnswer
+            }));
+          }
+        }
+
+        if (loadedQuestions.length === 0) {
+          loadedQuestions = generateFullMockTest(vargId, subject || 'general', testId);
+        }
+
+        if (loadedQuestions.length === 120) {
+          loadedQuestions = attachPartATo120Paper(loadedQuestions);
+        }
+
+        setQuestions(loadedQuestions);
+      } catch (err) {
+        console.error('Error fetching questions for answer key:', err);
+      } finally {
+        setLoadingQuestions(false);
+      }
+    }
+  };
 
   useEffect(() => {
     if (!vargId || !subject || !testId) return;
@@ -222,17 +271,27 @@ export default function ResultPage() {
                   <span className="bg-white/10 px-3 py-1 rounded-full border border-white/10">Rank #{userRank || '--'}</span>
                 </div>
 
-                <div className="pt-4 flex justify-center gap-3">
+                <div className="pt-4 flex flex-wrap justify-center gap-2.5">
                   <button 
+                    id="btn-result-dashboard"
                     onClick={() => navigate('/dashboard')}
-                    className="px-6 py-2 bg-white text-blue-900 rounded-lg font-bold hover:bg-blue-50 transition-colors flex items-center gap-1.5 text-xs"
+                    className="px-5 py-2.5 bg-white text-blue-900 rounded-xl font-bold hover:bg-blue-50 transition-all flex items-center gap-1.5 text-xs active:scale-95 shadow-sm"
                   >
                     <LayoutDashboard className="w-3.5 h-3.5" />
                     DASHBOARD
                   </button>
                   <button 
+                    id="btn-result-answer-key"
+                    onClick={openAnswerKey}
+                    className="px-5 py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-amber-950 rounded-xl font-black transition-all flex items-center gap-1.5 text-xs shadow-md shadow-amber-500/20 active:scale-95 border border-amber-300/40"
+                  >
+                    <Key className="w-3.5 h-3.5 fill-amber-950/30" />
+                    Answer Key 🔐
+                  </button>
+                  <button 
+                    id="btn-result-share"
                     onClick={handleShare}
-                    className="px-6 py-2 bg-blue-800 text-white rounded-lg font-bold border border-blue-700 hover:bg-blue-700 transition-colors flex items-center gap-1.5 text-xs"
+                    className="px-5 py-2.5 bg-blue-800 text-white rounded-xl font-bold border border-blue-700 hover:bg-blue-700 transition-all flex items-center gap-1.5 text-xs active:scale-95"
                   >
                     <Share2 className="w-3.5 h-3.5" />
                     SHARE
@@ -242,8 +301,17 @@ export default function ResultPage() {
             </motion.div>
           </div>
         ) : (
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-end gap-2.5">
             <button 
+              id="btn-board-answer-key"
+              onClick={openAnswerKey}
+              className="px-4 py-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-amber-950 rounded-xl font-black text-xs transition-all flex items-center gap-1.5 shadow-md shadow-amber-500/20 active:scale-95 border border-amber-300/40"
+            >
+              <Key className="w-3.5 h-3.5 fill-amber-950/30" />
+              Answer Key 🔐
+            </button>
+            <button 
+              id="btn-board-share"
               onClick={handleShare}
               className="px-4 py-2 bg-blue-900 text-white rounded-xl font-bold border border-blue-800 hover:bg-blue-800 transition-colors flex items-center gap-2 text-[10px] uppercase tracking-widest"
             >
@@ -375,6 +443,18 @@ export default function ResultPage() {
           </div>
         </div>
       </main>
+
+      {/* Full Answer Key Modal */}
+      <AnswerKeyModal
+        isOpen={showAnswerKey}
+        onClose={() => setShowAnswerKey(false)}
+        questions={questions}
+        userAnswers={userAnswers}
+        examTitle={getExamTitle(vargId, subject)}
+        score={score}
+        totalQuestions={totalQuestions}
+        loading={loadingQuestions}
+      />
     </div>
   );
 }

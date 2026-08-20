@@ -14,8 +14,6 @@ export default function Dashboard() {
 
   const [customGkTests, setCustomGkTests] = useState<any[]>([]);
   const [loadingGk, setLoadingGk] = useState(false);
-  const [customMptetTests, setCustomMptetTests] = useState<any[]>([]);
-  const [loadingMptet, setLoadingMptet] = useState(false);
   const [connectionError, setConnectionError] = useState<boolean>(false);
 
   const [unlockedTests, setUnlockedTests] = useState<string[]>([]);
@@ -293,46 +291,7 @@ export default function Dashboard() {
       }
     }
 
-    async function fetchCustomMptetTests() {
-      setLoadingMptet(true);
-      try {
-        const q = query(
-          collection(db, 'CustomMockTests'),
-          where('vargId', 'in', ['varg1', 'varg2', 'varg3'])
-        );
-        const querySnapshot = await getDocs(q);
-        const fetched = querySnapshot.docs.map(docSnap => {
-          const data = docSnap.data();
-          return {
-            id: docSnap.id,
-            title: data.title,
-            questions: data.questionsCount,
-            time: data.time,
-            difficulty: 'Medium',
-            price: data.price,
-            isFree: data.isFree,
-            vargId: data.vargId,
-            subject: data.subject,
-            isCustom: true
-          };
-        });
-        setCustomMptetTests(fetched);
-        setConnectionError(false);
-      } catch (err: any) {
-        console.error('Error fetching custom MPTET tests:', err);
-        setConnectionError(true);
-        try {
-          handleFirestoreError(err, OperationType.GET, 'CustomMockTests');
-        } catch (e) {
-          // Prevent crash, handled through UI state
-        }
-      } finally {
-        setLoadingMptet(false);
-      }
-    }
-
     fetchCustomGkTests();
-    fetchCustomMptetTests();
   }, [user]);
 
   const menuItems = [
@@ -553,89 +512,6 @@ export default function Dashboard() {
                     </motion.div>
                   )}
                 </div>
-
-                {/* Additional Dynamic / Custom MPTET Tests */}
-                {customMptetTests.length > 0 && (
-                  <div className="space-y-4 pt-10 pb-12 border-t border-slate-200">
-                    <h3 className="text-sm font-black text-slate-800 tracking-tight flex items-center gap-1.5 uppercase">
-                      <Sparkles className="w-4 h-4 text-amber-500" />
-                      Dynamic MPTET Custom Tests / जोड़ी गई नवीन परीक्षाएँ
-                    </h3>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
-                      {customMptetTests.map((test) => {
-                        const testVargId = test.vargId || 'varg1';
-                        const testSubject = test.subject || 'general';
-                        const testKey = `${testVargId}_${testSubject}_${test.id}`;
-                        const isAdmin = user?.email === 'qzquiz50@gmail.com';
-                        const isUnlocked = test.isFree || unlockedTests.includes(testKey) || isAdmin;
-
-                        return (
-                          <div 
-                            key={test.id}
-                            className="relative bg-blue-900 border border-white/5 rounded-[1.5rem] p-5 hover:shadow-lg transition-all flex flex-col justify-between group overflow-hidden"
-                          >
-                            <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-blue-600 blur-2xl opacity-20 group-hover:opacity-35 transition-opacity duration-500" />
-                            
-                            <div className="relative z-10 space-y-3">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-emerald-500/20 text-emerald-400 border border-emerald-500/10">
-                                  {test.isFree ? 'FREE' : `₹${test.price}`}
-                                </span>
-                                <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-blue-500/20 text-blue-300 border border-blue-500/10">
-                                  {test.vargId === 'varg1' ? 'Varg 1' : test.vargId === 'varg2' ? 'Varg 2' : 'Varg 3'}
-                                </span>
-                                {test.subject && (
-                                  <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-white/10 text-slate-300">
-                                    {test.subject.toUpperCase()}
-                                  </span>
-                                )}
-                                {!isUnlocked && (
-                                  <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-white/10 text-blue-300 text-[8px] font-black uppercase tracking-widest border border-white/5">
-                                    <Lock className="w-2 h-2" />
-                                    Premium
-                                  </span>
-                                )}
-                              </div>
-                              <h4 className="font-extrabold text-white tracking-tight text-sm line-clamp-2 leading-snug group-hover:text-blue-200 transition-colors">
-                                {test.title}
-                              </h4>
-                            </div>
-
-                            <div className="relative z-10 mt-4 pt-3 border-t border-white/10 flex items-center justify-between">
-                              <div className="flex items-center gap-3 text-blue-200/50 text-[10px] font-bold">
-                                <span className="flex items-center gap-1">
-                                  <HelpCircle className="w-3 h-3 text-blue-300" />
-                                  {test.questions} Qs
-                                </span>
-                                <span className="flex items-center gap-1">
-                                  <Clock className="w-3 h-3 text-blue-300" />
-                                  {test.time} Min
-                                </span>
-                              </div>
-                              {isUnlocked ? (
-                                <button
-                                  onClick={() => navigate(`/varg/${test.vargId}/exam/${test.id}${test.subject ? `/${test.subject}` : ''}`)}
-                                  className="px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 active:scale-95 shadow-md shadow-blue-500/20"
-                                >
-                                  Start <Play className="w-2.5 h-2.5 fill-current" />
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={() => openCheckout(test)}
-                                  className="px-4 py-2 bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 text-amber-950 rounded-xl font-black text-[10px] tracking-widest uppercase hover:shadow-[0_8px_25px_-5px_rgba(245,158,11,0.5)] transition-all flex items-center justify-center gap-1 active:scale-95 border border-amber-300/30"
-                                >
-                                  <Zap className="w-3.5 h-3.5 fill-amber-950/40 mr-0.5" />
-                                  Unlock Now <span className="text-[11px] ml-1">₹{test.price ?? platformSettings.testPrice}</span>
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
             <Footer />

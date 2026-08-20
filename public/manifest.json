@@ -1,0 +1,25 @@
+{
+  "name": "Mockia",
+  "short_name": "Mockia",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "background_color": "#1e3a8a",
+  "theme_color": "#1e3a8a",
+  "orientation": "portrait-primary",
+  "description": "Mockia - MP Teacher Exam Preparation & Online Mock Tests",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

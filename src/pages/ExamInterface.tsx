@@ -228,6 +228,8 @@ export default function ExamInterface() {
           testId: testId || 'unknown',
           totalQuestions: questions.length,
           timestamp: new Date().toISOString(),
+          answers,
+          questions,
         }));
       } catch (storageErr) {
         console.warn('Could not cache result locally:', storageErr);
@@ -275,7 +277,9 @@ export default function ExamInterface() {
           vargId: vargId || 'unknown', 
           subject: subject || 'general',
           testId: testId || 'unknown',
-          totalQuestions: questions.length 
+          totalQuestions: questions.length,
+          answers,
+          questions
         } 
       });
     } else {

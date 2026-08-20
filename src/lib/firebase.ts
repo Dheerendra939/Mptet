@@ -1,16 +1,12 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { initializeFirestore, memoryLocalCache } from 'firebase/firestore';
+import { getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firestore with memory cache and force long polling to avoid 10s stream timeouts in sandbox containers.
-const dbId = firebaseConfig.firestoreDatabaseId;
-export const db = initializeFirestore(app, {
-  localCache: memoryLocalCache(),
-  experimentalForceLongPolling: true,
-}, dbId && dbId !== '(default)' ? dbId : undefined);
+// Initialize Firestore using the configured database ID
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
 export const auth = getAuth(app);
 
