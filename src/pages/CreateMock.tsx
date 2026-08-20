@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { 
   ChevronLeft, LayoutDashboard, FileText, CheckCircle2, AlertCircle, 
-  HelpCircle, Play, Sparkles, BookOpen, Clock, Zap, Plus, ArrowRight 
+  HelpCircle, Play, Sparkles, BookOpen, Clock, Zap, Plus, ArrowRight, LogIn
 } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { db, auth } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { signInAnonymously, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { useAuth } from '../contexts/AuthContext';
 
 const SUBJECTS_VARG1 = [
   'Hindi', 'English', 'Sanskrit', 'Urdu', 'Mathematics', 'Physics', 'Biology', 
@@ -22,6 +24,7 @@ const SUBJECTS_VARG2 = [
 
 export default function CreateMock() {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   // Form states
   const [title, setTitle] = useState('');
@@ -161,9 +164,18 @@ export default function CreateMock() {
 
     setSaving(true);
     try {
+      // Ensure Firebase auth session exists
+      if (!auth.currentUser) {
+        try {
+          await signInAnonymously(auth);
+        } catch (authErr) {
+          console.warn('Anonymous session initialization notice:', authErr);
+        }
+      }
+
       const parsed = JSON.parse(questionsJson);
       
-      const payload = {
+      const payload: Record<string, any> = {
         title: title.trim(),
         vargId,
         subject: subject.toLowerCase(),
@@ -176,6 +188,13 @@ export default function CreateMock() {
         createdAt: serverTimestamp()
       };
 
+      if (auth.currentUser?.uid) {
+        payload.authorId = auth.currentUser.uid;
+      }
+      if (auth.currentUser?.email) {
+        payload.authorEmail = auth.currentUser.email;
+      }
+
       await addDoc(collection(db, 'CustomMockTests'), payload);
       setSaveSuccess(true);
       setTimeout(() => {
@@ -183,7 +202,12 @@ export default function CreateMock() {
       }, 1500);
     } catch (err: any) {
       console.error('Error saving mock test:', err);
-      setGeneralError(err.message || 'Firestore connection issue. Please check your rules configuration.');
+      const errMsg = err?.message || '';
+      if (errMsg.includes('permission') || errMsg.includes('PERMISSION_DENIED')) {
+        setGeneralError('Insufficient permissions. Please make sure you are signed in with the Admin account (qzquiz50@gmail.com).');
+      } else {
+        setGeneralError(errMsg || 'Failed to save mock test. Please check your internet connection.');
+      }
     } finally {
       setSaving(false);
     }

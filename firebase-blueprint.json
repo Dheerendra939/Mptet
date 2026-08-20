@@ -211,6 +211,18 @@
           "type": "string",
           "description": "JSON string representing array of question objects."
         },
+        "joinedCount": {
+          "type": "number",
+          "description": "Number of users who took or joined this mock test."
+        },
+        "authorId": {
+          "type": "string",
+          "description": "UID of the creator/admin."
+        },
+        "authorEmail": {
+          "type": "string",
+          "description": "Email address of the creator/admin."
+        },
         "createdAt": {
           "type": "string",
           "format": "date-time",
