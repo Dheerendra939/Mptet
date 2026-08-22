@@ -6,7 +6,7 @@
   "display": "standalone",
   "background_color": "#1e3a8a",
   "theme_color": "#1e3a8a",
-  "orientation": "portrait-primary",
+  "orientation": "any",
   "description": "Mockia - MP Teacher Exam Preparation & Online Mock Tests",
   "icons": [
     {

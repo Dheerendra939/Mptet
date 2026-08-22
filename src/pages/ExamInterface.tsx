@@ -23,7 +23,6 @@ export default function ExamInterface() {
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [verifying, setVerifying] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [alreadyAttempted, setAlreadyAttempted] = useState(false);
 
   // Security Check & Data Initialization
   useEffect(() => {
@@ -31,24 +30,6 @@ export default function ExamInterface() {
       if (!vargId) return;
       
       setVerifying(true);
-      
-      // 0. Unique attempt lock verification (for logged in users)
-      if (user) {
-        const entryId = getSafeEntryId(user.uid, vargId, subject, testId);
-        const isAdmin = user.email === 'qzquiz50@gmail.com';
-        try {
-          if (!isAdmin) {
-            const leaderSnap = await getDoc(doc(db, 'Leaderboards', entryId));
-            if (leaderSnap.exists()) {
-              setAlreadyAttempted(true);
-              setVerifying(false);
-              return;
-            }
-          }
-        } catch (err) {
-          console.warn('Leaderboard check error:', err);
-        }
-      }
 
       try {
         // 1. Verify Access (Simulated for dev, usually checks Firestore purchases)
@@ -304,42 +285,6 @@ export default function ExamInterface() {
         <RefreshCw className="w-16 h-16 text-blue-400 animate-spin" />
         <h2 className="text-2xl font-bold">Initializing Exam Engine</h2>
         <p className="text-slate-400">Please wait while we load the questions for your Mockia.in test...</p>
-      </div>
-    );
-  }
-
-  if (alreadyAttempted) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-white text-center">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="bg-slate-900 border border-white/10 rounded-[2rem] p-8 max-w-md w-full text-center space-y-6 shadow-2xl relative overflow-hidden"
-        >
-          <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-rose-500 blur-3xl opacity-20" />
-          <div className="w-16 h-16 bg-rose-500/10 rounded-full flex items-center justify-center text-rose-500 mx-auto border border-rose-500/20">
-            <AlertCircle className="w-8 h-8" />
-          </div>
-          
-          <div className="space-y-2">
-            <h3 className="text-xl font-black text-rose-500 tracking-tight">प्रयास की सीमा समाप्त! / Attempt Limit Exceeded</h3>
-            <p className="text-xs text-slate-300 font-bold leading-relaxed">
-              आप इस लाइव/मॉक टेस्ट को केवल एक ही बार प्रयास कर सकते हैं। आप पहले ही इस टेस्ट को पूरा और सबमिट कर चुके हैं।
-            </p>
-            <p className="text-[11px] text-slate-400 leading-normal">
-              You can only attempt this online test once. You have already submitted answers for this test key.
-            </p>
-          </div>
-
-          <div className="pt-2">
-            <button 
-              onClick={() => navigate('/dashboard')}
-              className="w-full py-3 bg-white text-slate-950 hover:bg-slate-100 rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-lg active:scale-95"
-            >
-              डैशबोर्ड पर जाएं / Back to Dashboard
-            </button>
-          </div>
-        </motion.div>
       </div>
     );
   }

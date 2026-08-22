@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Trophy, Medal, Users, ChevronLeft, LayoutDashboard, Share2, Download, Key, BookOpen } from 'lucide-react';
+import { Trophy, Medal, Users, ChevronLeft, LayoutDashboard, Share2, Download, Key, BookOpen, RotateCcw } from 'lucide-react';
 import { collection, query, where, orderBy, limit, onSnapshot, getDoc, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
@@ -237,6 +237,14 @@ export default function ResultPage() {
     }
   };
 
+  const handleRetry = () => {
+    if (vargId && testId) {
+      navigate(`/varg/${vargId}/exam/${testId}${subject ? `/${subject}` : ''}`);
+    } else {
+      navigate('/dashboard');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-20">
       <Navbar />
@@ -273,6 +281,14 @@ export default function ResultPage() {
 
                 <div className="pt-4 flex flex-wrap justify-center gap-2.5">
                   <button 
+                    id="btn-result-retry"
+                    onClick={handleRetry}
+                    className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-black transition-all flex items-center gap-1.5 text-xs shadow-md shadow-emerald-500/20 active:scale-95 border border-emerald-400/40"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    RETRY / पुनः प्रयास
+                  </button>
+                  <button 
                     id="btn-result-dashboard"
                     onClick={() => navigate('/dashboard')}
                     className="px-5 py-2.5 bg-white text-blue-900 rounded-xl font-bold hover:bg-blue-50 transition-all flex items-center gap-1.5 text-xs active:scale-95 shadow-sm"
@@ -302,6 +318,14 @@ export default function ResultPage() {
           </div>
         ) : (
           <div className="flex items-center justify-end gap-2.5">
+            <button 
+              id="btn-board-retry"
+              onClick={handleRetry}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black text-xs transition-all flex items-center gap-1.5 shadow-md shadow-emerald-600/20 active:scale-95 border border-emerald-500/40"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Re-attempt Test
+            </button>
             <button 
               id="btn-board-answer-key"
               onClick={openAnswerKey}
