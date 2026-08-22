@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { ChevronLeft, LayoutDashboard, FileText, BarChart3, BookMarked, Play, Clock, HelpCircle, Trophy, Lock, Zap, X, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, LayoutDashboard, FileText, BarChart3, BookMarked, Play, Clock, HelpCircle, Trophy, Lock, Zap, X, AlertCircle, CheckCircle2, Pencil } from 'lucide-react';
 import { collection, query, where, getDocs, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import EditMockModal from '../components/EditMockModal';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -246,41 +247,50 @@ export default function TestList() {
   ];
 
   const [customTests, setCustomTests] = useState<any[]>([]);
+  const [editingTest, setEditingTest] = useState<any>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  const fetchCustomTests = useCallback(async () => {
+    try {
+      const q = vargId === 'gk'
+        ? query(collection(db, 'CustomMockTests'), where('vargId', '==', 'gk'))
+        : query(
+            collection(db, 'CustomMockTests'),
+            where('vargId', '==', vargId),
+            where('subject', '==', (subject || 'general').toLowerCase())
+          );
+      const querySnapshot = await getDocs(q);
+      const fetched = querySnapshot.docs.map(docSnap => {
+        const data = docSnap.data();
+        return {
+          id: docSnap.id,
+          title: data.title,
+          questions: data.questionsCount,
+          rawQuestions: data.questions,
+          time: data.time,
+          difficulty: 'Medium',
+          price: data.price,
+          isFree: data.isFree,
+          isCustom: true
+        };
+      });
+      setCustomTests(fetched);
+    } catch (err) {
+      console.error('Error fetching custom tests:', err);
+      try {
+        handleFirestoreError(err, OperationType.GET, 'CustomMockTests');
+      } catch (_) {}
+    }
+  }, [vargId, subject]);
 
   useEffect(() => {
-    async function fetchCustomTests() {
-      try {
-        const q = vargId === 'gk'
-          ? query(collection(db, 'CustomMockTests'), where('vargId', '==', 'gk'))
-          : query(
-              collection(db, 'CustomMockTests'),
-              where('vargId', '==', vargId),
-              where('subject', '==', (subject || 'general').toLowerCase())
-            );
-        const querySnapshot = await getDocs(q);
-        const fetched = querySnapshot.docs.map(docSnap => {
-          const data = docSnap.data();
-          return {
-            id: docSnap.id,
-            title: data.title,
-            questions: data.questionsCount,
-            time: data.time,
-            difficulty: 'Medium',
-            price: data.price,
-            isFree: data.isFree,
-            isCustom: true
-          };
-        });
-        setCustomTests(fetched);
-      } catch (err) {
-        console.error('Error fetching custom tests:', err);
-        try {
-          handleFirestoreError(err, OperationType.GET, 'CustomMockTests');
-        } catch (_) {}
-      }
-    }
     fetchCustomTests();
-  }, [vargId, subject]);
+  }, [fetchCustomTests]);
+
+  const handleOpenEdit = (test: any) => {
+    setEditingTest(test);
+    setIsEditModalOpen(true);
+  };
 
   const tests = vargId === 'gk'
     ? customTests
@@ -297,7 +307,7 @@ export default function TestList() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden">
+    <div className="flex flex-col min-h-screen bg-slate-50 font-sans text-slate-900">
       <Navbar />
 
       <div className="flex flex-1 overflow-hidden">
@@ -388,6 +398,22 @@ export default function TestList() {
                             Premium
                           </div>
                         ) : null}
+
+                        {/* Admin Edit Button above/on each mock test card */}
+                        {isAdmin && (
+                          <button
+                            id={`btn-edit-test-${test.id}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenEdit(test);
+                            }}
+                            className="px-2.5 py-0.5 rounded bg-amber-400 hover:bg-amber-300 text-amber-950 text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shadow-sm border border-amber-300 transition-all transform active:scale-95 cursor-pointer ml-auto"
+                            title="Edit test price, title, and questions"
+                          >
+                            <Pencil className="w-2.5 h-2.5" />
+                            Edit Test / संपादित करें
+                          </button>
+                        )}
                       </div>
                       
                       <h3 className="text-lg font-black text-white tracking-tight group-hover:text-blue-200 transition-colors leading-tight">{test.title}</h3>
@@ -452,6 +478,16 @@ export default function TestList() {
           </div>
         </main>
       </div>
+
+      {/* Edit Mock Test Modal for Admin */}
+      <EditMockModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        test={editingTest}
+        vargId={vargId}
+        subject={subject}
+        onSaved={fetchCustomTests}
+      />
 
       {/* Checkout modal overlay */}
       {isCheckoutOpen && selectedTest && (

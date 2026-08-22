@@ -39,13 +39,13 @@ export default function ExamInterface() {
         let loadedQuestions: Question[] = [];
         let durationSeconds = 150 * 60;
 
-        if (testId && testId !== '1') {
+        if (testId) {
           try {
             const docRef = doc(db, 'CustomMockTests', testId);
             const docSnap = await getDoc(docRef);
             if (docSnap.exists()) {
               const testData = docSnap.data();
-              const parsedQuestions = JSON.parse(testData.questions);
+              const parsedQuestions = typeof testData.questions === 'string' ? JSON.parse(testData.questions) : testData.questions;
               loadedQuestions = parsedQuestions.map((q: any, idx: number) => ({
                 id: idx + 1,
                 section: q.section || 'General',
@@ -94,7 +94,7 @@ export default function ExamInterface() {
       }
     }
     initializeTest();
-  }, [user, vargId, subject]);
+  }, [user, vargId, subject, testId]);
 
   // Timer logic
   useEffect(() => {

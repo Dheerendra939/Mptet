@@ -73,6 +73,24 @@ function HomeRedirect() {
 }
 
 export default function App() {
+  // Screen orientation unlock helper for PWA / mobile rotation
+  React.useEffect(() => {
+    const unlockOrientation = async () => {
+      if (typeof window !== 'undefined' && 'screen' in window && window.screen.orientation) {
+        try {
+          if (typeof (window.screen.orientation as any).unlock === 'function') {
+            await (window.screen.orientation as any).unlock();
+          }
+        } catch (_) {
+          // Handled silently
+        }
+      }
+    };
+    unlockOrientation();
+    window.addEventListener('orientationchange', unlockOrientation);
+    return () => window.removeEventListener('orientationchange', unlockOrientation);
+  }, []);
+
   // Capture ?ref=CODE URL query parameters and store them in localStorage
   React.useEffect(() => {
     try {

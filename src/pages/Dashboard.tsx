@@ -332,7 +332,7 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden">
+    <div className="flex flex-col min-h-screen bg-slate-50 font-sans text-slate-900">
       <Navbar />
 
       <div className="flex flex-1 overflow-hidden">
