@@ -30,21 +30,18 @@ service cloud.firestore {
     // 3. Validation Blueprints
     function isValidPurchase(data) {
       return data.keys().hasAll(['userId', 'testId', 'vargId', 'subject', 'purchasedAt', 'paymentId'])
-        && (
-          data.keys().size() == 6 || (
-            data.keys().size() == 9 
-            && data.keys().hasAll(['promoCode', 'amountPaid', 'promoterUserId'])
-            && (data.promoCode == null || (data.promoCode is string && data.promoCode.size() <= 20))
-            && data.amountPaid is number && data.amountPaid >= 0 && data.amountPaid <= 100000
-            && (data.promoterUserId == null || (data.promoterUserId is string && data.promoterUserId.size() <= 128))
-          )
-        )
+        && data.keys().size() >= 6 && data.keys().size() <= 12
         && (request.auth == null || data.userId == request.auth.uid)
         && data.testId is string && data.testId.size() <= 100
         && data.vargId in ['varg1', 'varg2', 'varg3', 'gk']
         && data.subject is string && data.subject.size() <= 50
         && data.purchasedAt == request.time
-        && data.paymentId is string && data.paymentId.size() <= 100;
+        && data.paymentId is string && data.paymentId.size() <= 100
+        && (!data.keys().hasAll(['promoCode']) || (data.promoCode == null || (data.promoCode is string && data.promoCode.size() <= 20)))
+        && (!data.keys().hasAll(['amountPaid']) || (data.amountPaid is number && data.amountPaid >= 0 && data.amountPaid <= 100000))
+        && (!data.keys().hasAll(['promoterUserId']) || (data.promoterUserId == null || (data.promoterUserId is string && data.promoterUserId.size() <= 128)))
+        && (!data.keys().hasAll(['promoterCommissionAmount']) || (data.promoterCommissionAmount is number && data.promoterCommissionAmount >= 0))
+        && (!data.keys().hasAll(['promoterCommissionPercent']) || (data.promoterCommissionPercent is number && data.promoterCommissionPercent >= 0 && data.promoterCommissionPercent <= 100));
     }
 
     function isValidPlatformSettings(data) {
@@ -72,17 +69,18 @@ service cloud.firestore {
 
     function isValidPromoter(data) {
       return data.keys().hasAll(['userId', 'name', 'promoCode', 'createdAt'])
-        && (
-          data.keys().size() == 4 || 
-          (data.keys().size() == 5 && (data.keys().hasAll(['upiNumber']) || data.keys().hasAll(['withdrawnAmount']))) ||
-          (data.keys().size() == 6 && data.keys().hasAll(['upiNumber', 'withdrawnAmount']))
-        )
+        && data.keys().size() >= 4 && data.keys().size() <= 16
         && data.userId is string && data.userId.size() <= 128
         && data.name is string && data.name.size() > 0 && data.name.size() <= 100
         && data.promoCode is string && data.promoCode.size() >= 3 && data.promoCode.size() <= 20
         && data.promoCode.matches('^[A-Z0-9]+$')
         && (!data.keys().hasAll(['upiNumber']) || (data.upiNumber is string && data.upiNumber.size() <= 128))
-        && (!data.keys().hasAll(['withdrawnAmount']) || (data.withdrawnAmount is number && data.withdrawnAmount >= 0));
+        && (!data.keys().hasAll(['email']) || (data.email is string && data.email.size() <= 128))
+        && (!data.keys().hasAll(['withdrawnAmount']) || (data.withdrawnAmount is number && data.withdrawnAmount >= 0))
+        && (!data.keys().hasAll(['commissionPercent']) || (data.commissionPercent is number && data.commissionPercent >= 0 && data.commissionPercent <= 100))
+        && (!data.keys().hasAll(['requestedCommissionPercent']) || (data.requestedCommissionPercent is number && data.requestedCommissionPercent >= 0 && data.requestedCommissionPercent <= 100))
+        && (!data.keys().hasAll(['commissionStatus']) || (data.commissionStatus in ['pending', 'approved', 'rejected']))
+        && (!data.keys().hasAll(['commissionNote']) || (data.commissionNote is string && data.commissionNote.size() <= 500));
     }
 
     function isValidWithdrawalRequest(data) {

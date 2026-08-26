@@ -219,9 +219,17 @@ export default function Dashboard() {
           };
 
           if (promoApplied) {
+            const finalPriceInRupees = Math.max(0, currentPrice - platformSettings.studentDiscount);
+            const commPercent = typeof promoApplied.commissionPercent === 'number' 
+              ? promoApplied.commissionPercent 
+              : 20;
+            const commAmount = Math.round((finalPriceInRupees * commPercent) / 100);
+
             purchasePayload.promoCode = promoApplied.promoCode;
-            purchasePayload.amountPaid = Math.max(0, currentPrice - platformSettings.studentDiscount) * 100;
+            purchasePayload.amountPaid = finalPriceInRupees * 100;
             purchasePayload.promoterUserId = promoApplied.userId;
+            purchasePayload.promoterCommissionPercent = commPercent;
+            purchasePayload.promoterCommissionAmount = commAmount;
           } else {
             purchasePayload.promoCode = null;
             purchasePayload.amountPaid = currentPrice * 100;

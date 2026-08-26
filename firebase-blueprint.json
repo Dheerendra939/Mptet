@@ -41,6 +41,14 @@
         "promoterUserId": {
           "type": "string",
           "description": "UID of the referring promoter."
+        },
+        "promoterCommissionPercent": {
+          "type": "number",
+          "description": "Commission percentage approved for promoter at time of sale."
+        },
+        "promoterCommissionAmount": {
+          "type": "number",
+          "description": "Commission amount earned by promoter in INR."
         }
       },
       "required": ["userId", "testId", "purchasedAt"]
@@ -103,6 +111,37 @@
         "withdrawnAmount": {
           "type": "number",
           "description": "Total amount approved and withdrawn."
+        },
+        "commissionPercent": {
+          "type": "number",
+          "description": "Currently active and approved commission percentage per sale."
+        },
+        "requestedCommissionPercent": {
+          "type": "number",
+          "description": "Commission percentage requested by the promoter for admin approval."
+        },
+        "commissionStatus": {
+          "type": "string",
+          "enum": ["pending", "approved", "rejected"],
+          "description": "Status of the promoter commission rate approval."
+        },
+        "commissionRequestedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the commission rate was submitted for approval."
+        },
+        "commissionApprovedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when admin approved or updated the rate."
+        },
+        "commissionNote": {
+          "type": "string",
+          "description": "Admin remarks or notes regarding commission rate."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email of the promoter."
         },
         "createdAt": {
           "type": "string",

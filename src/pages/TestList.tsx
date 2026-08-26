@@ -206,9 +206,16 @@ export default function TestList() {
           };
 
           if (promoApplied && !isGkExpired && basePrice !== 1) {
+            const commPercent = typeof promoApplied.commissionPercent === 'number' 
+              ? promoApplied.commissionPercent 
+              : 20;
+            const commAmount = Math.round(((payableAmountInMin / 100) * commPercent) / 100);
+
             purchasePayload.promoCode = promoApplied.promoCode;
             purchasePayload.amountPaid = payableAmountInMin;
             purchasePayload.promoterUserId = promoApplied.userId;
+            purchasePayload.promoterCommissionPercent = commPercent;
+            purchasePayload.promoterCommissionAmount = commAmount;
           } else {
             purchasePayload.promoCode = null;
             purchasePayload.amountPaid = payableAmountInMin;
