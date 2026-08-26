@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Trophy, Medal, Users, ChevronLeft, LayoutDashboard, Share2, Download, Key, BookOpen, RotateCcw } from 'lucide-react';
+import { Trophy, Medal, Users, ChevronLeft, LayoutDashboard, Share2, Download, Key, BookOpen, RotateCcw, Play } from 'lucide-react';
 import { collection, query, where, orderBy, limit, onSnapshot, getDoc, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
@@ -93,8 +93,20 @@ export default function ResultPage() {
   const [showAnswerKey, setShowAnswerKey] = useState<boolean>(false);
   const [loadingQuestions, setLoadingQuestions] = useState<boolean>(false);
 
-  // Pre-load or fetch questions for Answer Key
+  // Find user's entry in the leaderboard
+  const userEntry = leaderboard.find(entry => entry.userId === user?.uid || (submissionId && entry.id === submissionId));
+  const score = (stateScore !== null && stateScore !== undefined) ? stateScore : (userEntry ? userEntry.totalScore : null);
+  const hasAttempted = (stateScore !== null && stateScore !== undefined) || (userEntry !== undefined && userEntry !== null) || (score !== null && score !== undefined);
+  
+  const percentage = (score !== null && totalQuestions > 0) ? ((score / totalQuestions) * 100).toFixed(1) : null;
+  
+  // Find rank in the fetched leaderboard
+  const rankIndex = leaderboard.findIndex(entry => entry.userId === user?.uid || (submissionId && entry.id === submissionId));
+  const userRank = rankIndex !== -1 ? rankIndex + 1 : null;
+
+  // Pre-load or fetch questions for Answer Key (Only if user has attempted the test)
   const openAnswerKey = async () => {
+    if (!hasAttempted) return;
     setShowAnswerKey(true);
     if (questions.length === 0 && vargId && testId) {
       setLoadingQuestions(true);
@@ -196,16 +208,6 @@ export default function ResultPage() {
     }
   };
 
-  // Find user's entry in the leaderboard
-  const userEntry = leaderboard.find(entry => entry.userId === user?.uid || (submissionId && entry.id === submissionId));
-  const score = (stateScore !== null && stateScore !== undefined) ? stateScore : (userEntry ? userEntry.totalScore : null);
-  
-  const percentage = (score !== null && totalQuestions > 0) ? ((score / totalQuestions) * 100).toFixed(1) : null;
-  
-  // Find rank in the fetched leaderboard
-  const rankIndex = leaderboard.findIndex(entry => entry.userId === user?.uid || (submissionId && entry.id === submissionId));
-  const userRank = rankIndex !== -1 ? rankIndex + 1 : null;
-
   const handleShare = async () => {
     const examTitle = getExamTitle(vargId, subject);
     
@@ -258,7 +260,7 @@ export default function ResultPage() {
           Back
         </button>
 
-        {/* Result Header - Only show if score is provided (actual submission) */}
+        {/* Result Header - Only show if user has attempted the test (score is available) */}
         {score !== null ? (
           <div className="relative">
             <motion.div 
@@ -319,25 +321,17 @@ export default function ResultPage() {
         ) : (
           <div className="flex items-center justify-end gap-2.5">
             <button 
-              id="btn-board-retry"
+              id="btn-board-attempt"
               onClick={handleRetry}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black text-xs transition-all flex items-center gap-1.5 shadow-md shadow-emerald-600/20 active:scale-95 border border-emerald-500/40"
+              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black text-xs transition-all flex items-center gap-2 shadow-md shadow-emerald-600/20 active:scale-95 border border-emerald-500/40"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
-              Re-attempt Test
-            </button>
-            <button 
-              id="btn-board-answer-key"
-              onClick={openAnswerKey}
-              className="px-4 py-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-amber-950 rounded-xl font-black text-xs transition-all flex items-center gap-1.5 shadow-md shadow-amber-500/20 active:scale-95 border border-amber-300/40"
-            >
-              <Key className="w-3.5 h-3.5 fill-amber-950/30" />
-              Answer Key 🔐
+              <Play className="w-3.5 h-3.5 fill-current" />
+              Attempt Mock Test / टेस्ट दें
             </button>
             <button 
               id="btn-board-share"
               onClick={handleShare}
-              className="px-4 py-2 bg-blue-900 text-white rounded-xl font-bold border border-blue-800 hover:bg-blue-800 transition-colors flex items-center gap-2 text-[10px] uppercase tracking-widest"
+              className="px-4 py-2.5 bg-blue-900 text-white rounded-xl font-bold border border-blue-800 hover:bg-blue-800 transition-colors flex items-center gap-2 text-[10px] uppercase tracking-widest active:scale-95"
             >
               <Share2 className="w-3.5 h-3.5" />
               Share Board
@@ -468,17 +462,19 @@ export default function ResultPage() {
         </div>
       </main>
 
-      {/* Full Answer Key Modal */}
-      <AnswerKeyModal
-        isOpen={showAnswerKey}
-        onClose={() => setShowAnswerKey(false)}
-        questions={questions}
-        userAnswers={userAnswers}
-        examTitle={getExamTitle(vargId, subject)}
-        score={score}
-        totalQuestions={totalQuestions}
-        loading={loadingQuestions}
-      />
+      {/* Full Answer Key Modal (Only accessible if user attempted the mock test) */}
+      {hasAttempted && (
+        <AnswerKeyModal
+          isOpen={showAnswerKey}
+          onClose={() => setShowAnswerKey(false)}
+          questions={questions}
+          userAnswers={userAnswers}
+          examTitle={getExamTitle(vargId, subject)}
+          score={score}
+          totalQuestions={totalQuestions}
+          loading={loadingQuestions}
+        />
+      )}
     </div>
   );
 }
