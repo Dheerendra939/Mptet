@@ -20,11 +20,6 @@ import Terms from './pages/legal/Terms';
 import RefundPolicy from './pages/legal/RefundPolicy';
 import AboutUs from './pages/legal/AboutUs';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { LanguageProvider } from './contexts/LanguageContext';
-import { DownloadPage } from './pages/DownloadPage';
-import { OpenPage } from './pages/OpenPage';
-import { ContinuePage } from './pages/ContinuePage';
-import { FilePage } from './pages/FilePage';
 import IFrameWarning from './components/IFrameWarning';
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
@@ -113,17 +108,10 @@ export default function App() {
 
   return (
     <AuthProvider>
-      <LanguageProvider>
-        <IFrameWarning />
-        <BrowserRouter>
-          <Routes>
-            {/* Arbitrage Fast Download Flow */}
-            <Route path="/download" element={<DownloadPage />} />
-            <Route path="/open" element={<OpenPage />} />
-            <Route path="/continue" element={<ContinuePage />} />
-            <Route path="/file" element={<FilePage />} />
-
-            <Route path="/auth" element={<AuthPage />} />
+      <IFrameWarning />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/auth" element={<AuthPage />} />
           
           <Route 
             path="/promoters" 
@@ -240,13 +228,11 @@ export default function App() {
           <Route path="/refund-policy" element={<RefundPolicy />} />
           <Route path="/about-us" element={<AboutUs />} />
 
-          {/* Root Redirect to download page */}
-          <Route path="/" element={<Navigate to="/download" replace />} />
-          <Route path="*" element={<Navigate to="/download" replace />} />
+          <Route path="/" element={<HomeRedirect />} />
+          <Route path="*" element={<HomeRedirect />} />
         </Routes>
       </BrowserRouter>
-    </LanguageProvider>
-  </AuthProvider>
-);
+    </AuthProvider>
+  );
 }
 

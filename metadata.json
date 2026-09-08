@@ -1,6 +1,6 @@
 {
   "name": "Mockia",
-  "description": "Ultra-fast download and content delivery portal with device language localization, verification flows, and multi-server download mirrors.",
+  "description": "Online Mock Test Platform for Madhya Pradesh Middle & High School Teacher Recruitment Exams (MP Varg 1, Varg 2, and Varg 3).",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
