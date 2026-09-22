@@ -1,6 +1,6 @@
 {
   "name": "Mockia",
-  "description": "Online Mock Test Platform for Madhya Pradesh Middle & High School Teacher Recruitment Exams (MP Varg 1, Varg 2, and Varg 3).",
+  "description": "Worldwide Utility & Calculator Suite with 100 dedicated free online tools for finance, STEM, development, content, productivity, career, and health.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

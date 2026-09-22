@@ -4,20 +4,21 @@ import { motion } from 'motion/react';
 import { 
   Trophy, TrendingUp, Coins, Check, ArrowLeft, 
   Clock, AlertCircle, CheckCircle2, XCircle, Send, CreditCard,
-  Percent, Users, ShieldCheck, Edit3, X, Sparkles, Filter, Search
+  Percent, Users, ShieldCheck, Edit3, X, Sparkles, Filter, Search, Mail
 } from 'lucide-react';
 import { collection, query, getDocs, doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import AdminEmailSender from '../components/AdminEmailSender';
 
 export default function PromotersWithdrawalRequests() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'commissions' | 'withdrawals' | 'settings'>('commissions');
+  const [activeTab, setActiveTab] = useState<'commissions' | 'withdrawals' | 'emails' | 'settings'>('commissions');
   
   // Data states
   const [requests, setRequests] = useState<any[]>([]);
@@ -470,6 +471,19 @@ export default function PromotersWithdrawalRequests() {
               >
                 <CreditCard className="w-4 h-4" />
                 <span>विथड्रॉवल भुगतान ({pendingWithdrawals.length} Pending)</span>
+              </button>
+
+              <button
+                id="tab-emails-btn"
+                onClick={() => setActiveTab('emails')}
+                className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer ${
+                  activeTab === 'emails'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                <Mail className="w-4 h-4" />
+                <span>ईमेल प्रेषक (Email Sender)</span>
               </button>
 
               <button
@@ -1051,6 +1065,11 @@ export default function PromotersWithdrawalRequests() {
                 </button>
               </form>
             </div>
+          )}
+
+          {/* TAB 4: Email Sender Broadcast Desk */}
+          {activeTab === 'emails' && (
+            <AdminEmailSender />
           )}
         </div>
       </main>

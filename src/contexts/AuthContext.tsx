@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User, signInAnonymously } from 'firebase/auth';
-import { auth } from '../lib/firebase';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '../lib/firebase';
 
 interface AuthContextType {
   user: User | null;
@@ -18,9 +19,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setFirebaseUser(user);
       setLoading(false);
+
+      if (user && !user.isAnonymous && user.email) {
+        try {
+          const userRef = doc(db, 'Users', user.uid);
+          await setDoc(userRef, {
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName || user.email.split('@')[0],
+            photoURL: user.photoURL || null,
+            lastLoginAt: serverTimestamp(),
+            role: user.email === 'qzquiz50@gmail.com' ? 'admin' : 'student'
+          }, { merge: true });
+        } catch (err) {
+          console.warn('Silent user profile sync notice:', err);
+        }
+      }
     });
 
     return () => unsubscribe();

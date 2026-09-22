@@ -1,238 +1,187 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
+import React, { useState, useEffect, useCallback } from 'react';
+import { Header } from './components/Header';
+import { HomeDirectoryView } from './components/HomeDirectoryView';
+import { ToolFormView } from './components/ToolFormView';
+import { TOOLS_DATA, findToolBySlugOrId } from './data/toolsData';
+import { ToolDefinition, ToolCategory } from './types';
+import { applyToolSEO, resetToDefaultSEO } from './lib/seo';
 
-import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import AuthPage from './pages/Auth';
-import Dashboard from './pages/Dashboard';
-import VargSubjects from './pages/VargSubjects';
-import TestList from './pages/TestList';
-import ExamInterface from './pages/ExamInterface';
-import ResultPage from './pages/ResultPage';
-import PromoterPanel from './pages/PromoterPanel';
-import PromotersWithdrawalRequests from './pages/PromotersWithdrawalRequests';
-import CreateMock from './pages/CreateMock';
-import ContactUs from './pages/legal/ContactUs';
-import PrivacyPolicy from './pages/legal/PrivacyPolicy';
-import Terms from './pages/legal/Terms';
-import RefundPolicy from './pages/legal/RefundPolicy';
-import AboutUs from './pages/legal/AboutUs';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import IFrameWarning from './components/IFrameWarning';
+function parseToolFromUrl(): ToolDefinition | null {
+  try {
+    const pathname = window.location.pathname;
+    const searchParams = new URLSearchParams(window.location.search);
+    const hash = window.location.hash;
 
-function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+    // Check query param first: ?tool=slug or ?id=slug
+    const queryTool = searchParams.get('tool') || searchParams.get('id');
+    if (queryTool) {
+      const match = findToolBySlugOrId(queryTool);
+      if (match) return match;
+    }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="w-10 h-10 border-4 border-blue-600/30 border-t-blue-600 rounded-full animate-spin" />
-      </div>
-    );
+    // Check hash: #/tool/slug or #/tools/slug
+    if (hash && hash.startsWith('#')) {
+      const hashClean = hash.replace(/^#\/?/, '');
+      const parts = hashClean.split('/');
+      const potentialSlug = parts[parts.length - 1];
+      if (potentialSlug) {
+        const match = findToolBySlugOrId(potentialSlug);
+        if (match) return match;
+      }
+    }
+
+    // Check path: /tool/:slug or /tools/:slug or /:slug
+    if (pathname && pathname !== '/') {
+      const segments = pathname.split('/').filter(Boolean);
+      if (segments.length > 0) {
+        // Last segment
+        const lastSegment = segments[segments.length - 1];
+        const match = findToolBySlugOrId(lastSegment);
+        if (match) return match;
+
+        // If first segment was 'tool' or 'tools', check next segment
+        if ((segments[0] === 'tool' || segments[0] === 'tools') && segments[1]) {
+          const matchSub = findToolBySlugOrId(segments[1]);
+          if (matchSub) return matchSub;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Error parsing tool from URL', e);
   }
 
-  if (!user || user.email !== 'qzquiz50@gmail.com') {
-    return <Navigate to="/dashboard" replace />;
-  }
-
-  return <>{children}</>;
-}
-
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="w-10 h-10 border-4 border-blue-600/30 border-t-blue-600 rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Navigate to="/auth" replace />;
-  }
-
-  return <>{children}</>;
-}
-
-function HomeRedirect() {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="w-10 h-10 border-4 border-blue-600/30 border-t-blue-600 rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  return user ? <Navigate to="/dashboard" replace /> : <Navigate to="/auth" replace />;
+  return null;
 }
 
 export default function App() {
-  // Screen orientation unlock helper for PWA / mobile rotation
-  React.useEffect(() => {
-    const unlockOrientation = async () => {
-      if (typeof window !== 'undefined' && 'screen' in window && window.screen.orientation) {
-        try {
-          if (typeof (window.screen.orientation as any).unlock === 'function') {
-            await (window.screen.orientation as any).unlock();
-          }
-        } catch (_) {
-          // Handled silently
-        }
-      }
+  const [activeTool, setActiveTool] = useState<ToolDefinition | null>(() => parseToolFromUrl());
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<ToolCategory>('All');
+
+  // Sync SEO and Document Title whenever activeTool changes
+  useEffect(() => {
+    const origin = window.location.origin;
+    if (activeTool) {
+      applyToolSEO(activeTool, origin);
+    } else {
+      resetToDefaultSEO(origin, TOOLS_DATA);
+    }
+  }, [activeTool]);
+
+  // Handle browser back/forward buttons (popstate)
+  useEffect(() => {
+    const handlePopState = () => {
+      const tool = parseToolFromUrl();
+      setActiveTool(tool);
     };
-    unlockOrientation();
-    window.addEventListener('orientationchange', unlockOrientation);
-    return () => window.removeEventListener('orientationchange', unlockOrientation);
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Capture ?ref=CODE URL query parameters and store them in localStorage
-  React.useEffect(() => {
+  const handleSelectTool = useCallback((tool: ToolDefinition) => {
+    setActiveTool(tool);
     try {
-      const params = new URLSearchParams(window.location.search);
-      const refCode = params.get('ref');
-      if (refCode) {
-        const cleanCode = refCode.trim().toUpperCase();
-        localStorage.setItem('referrerPromoCode', cleanCode);
-        console.log('Automatically cached referral promo code:', cleanCode);
+      const targetPath = `/tool/${tool.slug}`;
+      if (window.location.pathname !== targetPath) {
+        window.history.pushState({ toolId: tool.id }, '', targetPath);
       }
     } catch (e) {
-      console.error('Error extracting referral code:', e);
+      // Fallback for sandboxed frames without pushState permissions
+      try {
+        window.location.hash = `/tool/${tool.slug}`;
+      } catch (err) {}
     }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  const handleNavigateHome = useCallback(() => {
+    setActiveTool(null);
+    try {
+      if (window.location.pathname !== '/') {
+        window.history.pushState(null, '', '/');
+      }
+    } catch (e) {
+      try {
+        window.location.hash = '';
+      } catch (err) {}
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
   return (
-    <AuthProvider>
-      <IFrameWarning />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/auth" element={<AuthPage />} />
-          
-          <Route 
-            path="/promoters" 
-            element={
-              <PromoterPanel />
-            } 
-          />
+    <div className="min-h-screen bg-slate-50 text-slate-800 selection:bg-slate-200 selection:text-slate-900 flex flex-col justify-between">
+      <div>
+        {/* Navigation Header */}
+        <Header
+          activeTool={activeTool || undefined}
+          onNavigateHome={handleNavigateHome}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+        />
 
-          <Route 
-            path="/promoterswithdrawalrequests" 
-            element={
-              <ProtectedRoute>
-                <PromotersWithdrawalRequests />
-              </ProtectedRoute>
-            } 
-          />
+        {/* Main Content Area */}
+        <main>
+          {activeTool ? (
+            /* Dedicated Single-Tool Full Form View */
+            <ToolFormView
+              tool={activeTool}
+              onNavigateHome={handleNavigateHome}
+              onSelectTool={handleSelectTool}
+              allTools={TOOLS_DATA}
+            />
+          ) : (
+            /* Tools Directory Hub */
+            <HomeDirectoryView
+              tools={TOOLS_DATA}
+              onSelectTool={handleSelectTool}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              selectedCategory={selectedCategory}
+              onSelectCategory={setSelectedCategory}
+            />
+          )}
+        </main>
+      </div>
 
-          <Route 
-            path="/create-mock" 
-            element={
-              <AdminRoute>
-                <CreateMock />
-              </AdminRoute>
-            } 
-          />
+      {/* Global Footer */}
+      <footer className="mt-20 border-t border-slate-200 bg-white py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-slate-800">Mockia</span>
+            <span>—</span>
+            <span>Worldwide Online Utility & Calculator Suite (100 Free Tools)</span>
+          </div>
 
-          <Route 
-            path="/dashboard" 
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            } 
-          />
-
-          <Route 
-            path="/varg1/subjects" 
-            element={
-              <ProtectedRoute>
-                <VargSubjects />
-              </ProtectedRoute>
-            } 
-          />
-
-          <Route 
-            path="/varg2/subjects" 
-            element={
-              <ProtectedRoute>
-                <VargSubjects />
-              </ProtectedRoute>
-            } 
-          />
-
-          <Route 
-            path="/varg3/tests" 
-            element={
-              <ProtectedRoute>
-                <TestList />
-              </ProtectedRoute>
-            } 
-          />
-
-          <Route 
-            path="/varg1/tests/:subject" 
-            element={
-              <ProtectedRoute>
-                <TestList />
-              </ProtectedRoute>
-            } 
-          />
-
-          <Route 
-            path="/varg2/tests/:subject" 
-            element={
-              <ProtectedRoute>
-                <TestList />
-              </ProtectedRoute>
-            } 
-          />
-
-          <Route 
-            path="/varg/gk/tests" 
-            element={
-              <ProtectedRoute>
-                <TestList />
-              </ProtectedRoute>
-            } 
-          />
-
-          <Route 
-            path="/varg/:vargId/exam/:testId" 
-            element={
-              <ProtectedRoute>
-                <ExamInterface />
-              </ProtectedRoute>
-            } 
-          />
-
-          <Route 
-            path="/varg/:vargId/exam/:testId/:subject" 
-            element={
-              <ProtectedRoute>
-                <ExamInterface />
-              </ProtectedRoute>
-            } 
-          />
-
-          <Route path="/result" element={<ProtectedRoute><ResultPage /></ProtectedRoute>} />
-          
-          {/* Legal Pages */}
-          <Route path="/contact-us" element={<ContactUs />} />
-          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-          <Route path="/terms" element={<Terms />} />
-          <Route path="/refund-policy" element={<RefundPolicy />} />
-          <Route path="/about-us" element={<AboutUs />} />
-
-          <Route path="/" element={<HomeRedirect />} />
-          <Route path="*" element={<HomeRedirect />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+          <div className="flex items-center gap-4 text-slate-500">
+            <a
+              href="/"
+              onClick={(e) => {
+                if (!e.metaKey && !e.ctrlKey) {
+                  e.preventDefault();
+                  handleNavigateHome();
+                }
+              }}
+              className="hover:text-slate-900 font-medium transition-colors"
+            >
+              All 100 Tools
+            </a>
+            <span>•</span>
+            <a
+              href="/sitemap.xml"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-slate-900 transition-colors"
+            >
+              XML Sitemap
+            </a>
+            <span>•</span>
+            <span>100% Free Forever</span>
+            <span>•</span>
+            <span>Instant Results</span>
+          </div>
+        </div>
+      </footer>
+    </div>
   );
 }
-

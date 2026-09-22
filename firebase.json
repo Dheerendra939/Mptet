@@ -13,7 +13,14 @@
       }
     ]
   },
-  "firestore": {
-    "rules": "firestore.rules"
-  }
+  "firestore": [
+    {
+      "database": "(default)",
+      "rules": "firestore.rules"
+    },
+    {
+      "database": "ai-studio-d800f107-aee1-4097-8a5f-ca452409ac27",
+      "rules": "firestore.rules"
+    }
+  ]
 }
