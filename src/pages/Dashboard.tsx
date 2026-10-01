@@ -1,662 +1,601 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
-import { useNavigate } from 'react-router-dom';
-import { GraduationCap, LayoutDashboard, FileText, BarChart3, BookMarked, ArrowRight, BookOpen, School, Pencil, Zap, Clock, HelpCircle, Play, Plus, Sparkles, Lock, X, AlertCircle, CheckCircle2 } from 'lucide-react';
-import Navbar from '../components/Navbar';
-import Footer from '../components/Footer';
-import { useAuth } from '../contexts/AuthContext';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc, addDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import React, { useState, useEffect, useCallback } from 'react';
+import { 
+  Users, 
+  Calendar, 
+  Eye, 
+  TrendingUp, 
+  Clock, 
+  Globe, 
+  Smartphone, 
+  Monitor, 
+  RefreshCw, 
+  ArrowLeft, 
+  Activity, 
+  Layers, 
+  Compass, 
+  CheckCircle2, 
+  ShieldCheck,
+  MousePointerClick
+} from 'lucide-react';
+import { 
+  SiteOverviewStats, 
+  DailyVisitorStats, 
+  VisitorLogEvent, 
+  getTodayKey, 
+  subscribeOverview, 
+  subscribeTodayStats, 
+  fetchRecentEvents, 
+  fetchDailyHistory,
+  trackPageVisit
+} from '../lib/visitorTracker';
+import { TOOLS_DATA } from '../data/toolsData';
 
-export default function Dashboard() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
+interface DashboardProps {
+  onBackToHome?: () => void;
+}
 
-  const [customGkTests, setCustomGkTests] = useState<any[]>([]);
-  const [loadingGk, setLoadingGk] = useState(false);
-  const [connectionError, setConnectionError] = useState<boolean>(false);
+export default function Dashboard({ onBackToHome }: DashboardProps) {
+  const [todayKey] = useState<string>(() => getTodayKey());
+  const [overview, setOverview] = useState<SiteOverviewStats>({ totalVisitors: 0, totalPageViews: 0 });
+  const [todayStats, setTodayStats] = useState<DailyVisitorStats>({ date: todayKey, uniqueVisitors: 0, pageViews: 0 });
+  const [recentEvents, setRecentEvents] = useState<VisitorLogEvent[]>([]);
+  const [dailyHistory, setDailyHistory] = useState<DailyVisitorStats[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date>(new Date());
+  const [testVisitSuccess, setTestVisitSuccess] = useState<string | null>(null);
+  const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
 
-  const [unlockedTests, setUnlockedTests] = useState<string[]>([]);
-  const [platformSettings, setPlatformSettings] = useState({
-    testPrice: 30,
-    promoterCommission: 5,
-    studentDiscount: 5
-  });
-
-  // Promo and Checkout States
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-  const [selectedTest, setSelectedTest] = useState<any>(null);
-  const [promoVal, setPromoVal] = useState('');
-  const [promoLoading, setPromoLoading] = useState(false);
-  const [promoError, setPromoError] = useState('');
-  const [promoApplied, setPromoApplied] = useState<any>(null);
-
-  useEffect(() => {
-    async function fetchPlatformSettings() {
-      try {
-        const settingsRef = doc(db, 'Settings', 'platform');
-        const settingsSnap = await getDoc(settingsRef);
-        if (settingsSnap.exists()) {
-          const sData = settingsSnap.data();
-          setPlatformSettings({
-            testPrice: sData.testPrice ?? 30,
-            promoterCommission: sData.promoterCommission ?? 5,
-            studentDiscount: sData.studentDiscount ?? 5
-          });
-        }
-      } catch (err) {
-        console.warn('Using default platform settings due to network/cache state.');
+  // Manual & initial load
+  const loadData = useCallback(async (showIndicator = false) => {
+    if (showIndicator) setRefreshing(true);
+    try {
+      const [events, history] = await Promise.all([
+        fetchRecentEvents(30),
+        fetchDailyHistory(7)
+      ]);
+      setRecentEvents(events);
+      setDailyHistory(history);
+      setLastRefreshedAt(new Date());
+    } catch (err) {
+      console.warn('Dashboard load error:', err);
+    } finally {
+      setLoading(false);
+      if (showIndicator) {
+        setTimeout(() => setRefreshing(false), 400);
       }
     }
-    fetchPlatformSettings();
   }, []);
 
+  // Real-time Firestore subscriptions for Overview & Today
   useEffect(() => {
-    async function fetchPurchases() {
-      if (!user) return;
-      try {
-        const q = query(
-          collection(db, 'UserPurchases'),
-          where('userId', '==', user.uid)
-        );
-        const querySnapshot = await getDocs(q);
-        const purchasedIds = querySnapshot.docs.map(doc => doc.data().testId);
-        setUnlockedTests(purchasedIds);
-      } catch (error) {
-        console.error('Error fetching purchases:', error);
-        try {
-          handleFirestoreError(error, OperationType.GET, 'UserPurchases');
-        } catch (_) {}
-      }
-    }
-    fetchPurchases();
-  }, [user]);
-
-  // If there's a stored referral in localStorage, auto-fill and verify it on checkout open
-  useEffect(() => {
-    if (isCheckoutOpen) {
-      const savedReferral = localStorage.getItem('referrerPromoCode');
-      if (savedReferral) {
-        setPromoVal(savedReferral);
-        handleApplyPromo(savedReferral);
-      }
-    }
-  }, [isCheckoutOpen]);
-
-  const loadRazorpay = () => {
-    return new Promise((resolve) => {
-      if ((window as any).Razorpay) {
-        resolve(true);
-        return;
-      }
-      const existingScript = document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]');
-      if (existingScript) {
-        existingScript.addEventListener('load', () => resolve(true));
-        existingScript.addEventListener('error', () => resolve(false));
-        return;
-      }
-      const script = document.createElement('script');
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-      script.onload = () => resolve(true);
-      script.onerror = () => resolve(false);
-      document.body.appendChild(script);
+    const unsubOverview = subscribeOverview((data) => {
+      setOverview(data);
+      setLoading(false);
     });
-  };
 
-  const handleApplyPromo = async (codeToApply: string) => {
-    const cleanCode = codeToApply.trim().toUpperCase();
-    if (!cleanCode) return;
+    const unsubToday = subscribeTodayStats(todayKey, (data) => {
+      setTodayStats(data);
+    });
 
-    setPromoLoading(true);
-    setPromoError('');
-    setPromoApplied(null);
+    loadData(false);
 
-    try {
-      const q = query(
-        collection(db, 'Promoters'),
-        where('promoCode', '==', cleanCode)
-      );
-      const querySnapshot = await getDocs(q);
-
-      if (!querySnapshot.empty) {
-        const promoterDoc = querySnapshot.docs[0];
-        setPromoApplied(promoterDoc.data());
-        setPromoError('');
-      } else {
-        setPromoError('अमान्य प्रमोकोड। कृपया सही कोड दर्ज करें।');
-      }
-    } catch (err) {
-      console.error('Error verifying promoter code:', err);
-      setPromoError('तकनीकी त्रुटि। कृपया पुन: प्रयास करें।');
-      try {
-        handleFirestoreError(err, OperationType.GET, 'Promoters');
-      } catch (_) {}
-    } finally {
-      setPromoLoading(false);
-    }
-  };
-
-  const openCheckout = (test: any) => {
-    setSelectedTest(test);
-    setPromoVal('');
-    setPromoError('');
-    setPromoApplied(null);
-    setIsCheckoutOpen(true);
-  };
-
-  const handlePayment = async () => {
-    if (!selectedTest) return;
-
-    const testVargId = selectedTest.vargId || 'gk';
-    const testSubject = selectedTest.subject || 'general';
-    const currentPrice = selectedTest.price ?? platformSettings.testPrice;
-
-    // Check if it is explicitly free or if the calculated/discounted price is 0
-    const finalPrice = promoApplied 
-      ? Math.max(0, currentPrice - platformSettings.studentDiscount)
-      : currentPrice;
-
-    const isFreeTest = selectedTest.isFree || finalPrice === 0;
-
-    if (isFreeTest) {
-      try {
-        const purchasePayload: any = {
-          userId: user?.uid,
-          testId: `${testVargId}_${testSubject}_${selectedTest.id}`,
-          vargId: testVargId,
-          subject: testSubject,
-          purchasedAt: serverTimestamp(),
-          paymentId: 'FREE_REGISTRATION_OK'
-        };
-
-        if (promoApplied) {
-          purchasePayload.amountPaid = 0;
-          purchasePayload.promoCode = promoApplied.promoCode;
-          purchasePayload.promoterUserId = promoApplied.userId;
-        }
-
-        // Store purchase in Firestore
-        await addDoc(collection(db, 'UserPurchases'), purchasePayload);
-        
-        setUnlockedTests([...unlockedTests, `${testVargId}_${testSubject}_${selectedTest.id}`]);
-        setIsCheckoutOpen(false);
-        alert('सफलतापूर्वक अनलॉक हो गया है! / Registration Successful!');
-      } catch (error) {
-        console.error('Error saving free registration/purchase:', error);
-        alert('पंजीकरण करने में विफलता। कृपया पुन: प्रयास करें।');
-      }
-      return;
-    }
-
-    // Ensure Razorpay is loaded
-    if (!(window as any).Razorpay) {
-      const loaded = await loadRazorpay();
-      if (!loaded) {
-        alert('Failed to load payment gateway. Please check your internet connection.');
-        return;
-      }
-    }
-
-    const payableAmountInMin = promoApplied 
-      ? Math.max(0, currentPrice - platformSettings.studentDiscount) * 100 
-      : currentPrice * 100;
-
-    const options = {
-      key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_SqPoGL5YHv2fKo',
-      amount: payableAmountInMin,
-      currency: 'INR',
-      name: 'Mockia.in',
-      description: `Unlock ${selectedTest.title}`,
-      handler: async function (response: any) {
-        try {
-          const purchasePayload: any = {
-            userId: user?.uid,
-            testId: `${testVargId}_${testSubject}_${selectedTest.id}`,
-            vargId: testVargId,
-            subject: testSubject,
-            purchasedAt: serverTimestamp(),
-            paymentId: response.razorpay_payment_id
-          };
-
-          if (promoApplied) {
-            const finalPriceInRupees = Math.max(0, currentPrice - platformSettings.studentDiscount);
-            const commPercent = typeof promoApplied.commissionPercent === 'number' 
-              ? promoApplied.commissionPercent 
-              : 20;
-            const commAmount = Math.round((finalPriceInRupees * commPercent) / 100);
-
-            purchasePayload.promoCode = promoApplied.promoCode;
-            purchasePayload.amountPaid = finalPriceInRupees * 100;
-            purchasePayload.promoterUserId = promoApplied.userId;
-            purchasePayload.promoterCommissionPercent = commPercent;
-            purchasePayload.promoterCommissionAmount = commAmount;
-          } else {
-            purchasePayload.promoCode = null;
-            purchasePayload.amountPaid = currentPrice * 100;
-            purchasePayload.promoterUserId = null;
-          }
-
-          // Store purchase in Firestore
-          await addDoc(collection(db, 'UserPurchases'), purchasePayload);
-          
-          setUnlockedTests([...unlockedTests, `${testVargId}_${testSubject}_${selectedTest.id}`]);
-          setIsCheckoutOpen(false);
-          alert('Payment Successful! Test Unlocked.');
-        } catch (error) {
-          console.error('Error saving purchase:', error);
-          alert('Payment successful but failed to unlock test. Please contact support.');
-        }
-      },
-      prefill: {
-        name: user?.displayName || '',
-        email: user?.email || '',
-      },
-      theme: {
-        color: '#1e3a8a',
-      },
+    return () => {
+      unsubOverview();
+      unsubToday();
     };
+  }, [todayKey, loadData]);
 
-    const rzp1 = new (window as any).Razorpay(options);
-    rzp1.open();
+  // Periodic polling for events table & history if auto-refresh is enabled
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const interval = setInterval(() => {
+      loadData(false);
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [autoRefresh, loadData]);
+
+  // Set document title for Dashboard
+  useEffect(() => {
+    const prevTitle = document.title;
+    document.title = 'Analytics & Visitor Dashboard — Mockia';
+    return () => {
+      document.title = prevTitle;
+    };
+  }, []);
+
+  // Trigger test visit to verify live tracking
+  const handleTriggerTestVisit = async () => {
+    try {
+      const randomTool = TOOLS_DATA[Math.floor(Math.random() * TOOLS_DATA.length)];
+      await trackPageVisit(`/tool/${randomTool.slug}`, randomTool.title);
+      setTestVisitSuccess(`Simulated visit to "${randomTool.title}" logged!`);
+      setTimeout(() => {
+        loadData(false);
+      }, 800);
+      setTimeout(() => setTestVisitSuccess(null), 4000);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  useEffect(() => {
-    async function fetchCustomGkTests() {
-      setLoadingGk(true);
-      try {
-        const q = query(
-          collection(db, 'CustomMockTests'),
-          where('vargId', '==', 'gk')
-        );
-        const querySnapshot = await getDocs(q);
-        const fetched = querySnapshot.docs.map(docSnap => {
-          const data = docSnap.data();
-          return {
-            id: docSnap.id,
-            title: data.title,
-            questions: data.questionsCount,
-            time: data.time,
-            difficulty: 'Medium',
-            price: data.price,
-            isFree: data.isFree,
-            vargId: 'gk',
-            subject: 'general',
-            isCustom: true
-          };
-        });
-        setCustomGkTests(fetched);
-        setConnectionError(false);
-      } catch (err: any) {
-        console.error('Error fetching custom GK tests:', err);
-        setConnectionError(true);
-        try {
-          handleFirestoreError(err, OperationType.GET, 'CustomMockTests');
-        } catch (e) {
-          // Prevent crash, handled through UI state
-        }
-      } finally {
-        setLoadingGk(false);
-      }
+  // Compute breakdown stats
+  const deviceCounts = recentEvents.reduce((acc, ev) => {
+    const d = ev.deviceType || 'Desktop';
+    acc[d] = (acc[d] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const popularPages = recentEvents.reduce((acc, ev) => {
+    const p = ev.toolName || ev.path || '/';
+    acc[p] = (acc[p] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const sortedPopular = Object.entries(popularPages)
+    .sort(([, countA], [, countB]) => Number(countB) - Number(countA))
+    .slice(0, 5);
+
+  const avgViewsPerVisitor = Number(overview.totalVisitors) > 0 
+    ? (Number(overview.totalPageViews) / Number(overview.totalVisitors)).toFixed(1) 
+    : '1.0';
+
+  const todayViewsPerVisitor = Number(todayStats.uniqueVisitors) > 0
+    ? (Number(todayStats.pageViews) / Number(todayStats.uniqueVisitors)).toFixed(1)
+    : '1.0';
+
+  // Format relative time helper
+  const formatTimeAgo = (isoString?: string) => {
+    if (!isoString) return 'Just now';
+    try {
+      const then = new Date(isoString).getTime();
+      const now = Date.now();
+      const diffSec = Math.floor((now - then) / 1000);
+      if (diffSec < 10) return 'Just now';
+      if (diffSec < 60) return `${diffSec}s ago`;
+      const diffMin = Math.floor(diffSec / 60);
+      if (diffMin < 60) return `${diffMin}m ago`;
+      const diffHr = Math.floor(diffMin / 60);
+      if (diffHr < 24) return `${diffHr}h ago`;
+      return new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch (e) {
+      return 'Recent';
     }
-
-    fetchCustomGkTests();
-  }, [user]);
-
-  const menuItems = [
-    { label: 'Dashboard', icon: LayoutDashboard, active: true },
-    { label: 'My Mock Tests', icon: FileText, active: false },
-    { label: 'Performance', icon: BarChart3, active: false },
-    { label: 'Study Material', icon: BookMarked, active: false },
-  ];
-
-  const categories = [
-    { 
-      id: 'varg1', 
-      title: 'MPTET Varg 1', 
-      subtitle: 'High School Teacher', 
-      icon: School, 
-      color: 'blue', 
-      path: '/varg1/subjects',
-      description: 'Advanced preparation for 16 major high school subjects.'
-    },
-    { 
-      id: 'varg2', 
-      title: 'MPTET Varg 2', 
-      subtitle: 'Middle School Teacher', 
-      icon: GraduationCap, 
-      color: 'indigo', 
-      path: '/varg2/subjects',
-      description: 'Comprehensive coverage for 6 middle school core subjects.'
-    },
-    { 
-      id: 'varg3', 
-      title: 'MPTET Varg 3', 
-      subtitle: 'Primary Teacher', 
-      icon: Pencil, 
-      color: 'emerald', 
-      path: '/varg3/tests',
-      description: 'Foundational mock tests focused on child development and pedagogy.'
-    },
-  ];
+  };
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50 font-sans text-slate-900">
-      <Navbar />
-
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
-        <aside className="w-64 bg-white border-r border-slate-200 flex flex-col p-6 gap-8 hidden lg:flex">
-          <div className="space-y-1">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 ml-2">Main Menu</p>
-            {menuItems.map((item) => (
-              <button
-                key={item.label}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all ${
-                  item.active 
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' 
-                    : 'text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <item.icon className={`w-4 h-4 ${item.active ? 'text-white' : 'text-slate-400'}`} />
-                <span className="text-sm">{item.label}</span>
-              </button>
-            ))}
-          </div>
-
-          <div className="mt-auto bg-slate-900 rounded-2xl p-4 text-white relative overflow-hidden group">
-            <div className="absolute -right-4 -top-4 w-20 h-20 bg-blue-500/20 rounded-full blur-2xl group-hover:bg-blue-500/30 transition-all" />
-            <p className="text-[10px] font-black uppercase tracking-wider text-blue-400 mb-1">PRO PLAN</p>
-            <p className="text-xs font-medium leading-relaxed opacity-80 mb-3">Unlock 500+ premium mock tests & detailed analysis.</p>
-            <button className="w-full py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-lg hover:shadow-blue-500/20 transition-all flex items-center justify-center gap-2">
-              <Zap className="w-3 h-3 fill-current" />
-              Upgrade Now
-            </button>
-          </div>
-        </aside>
-
-        {/* Main Content */}
-        <main className="flex-1 overflow-y-auto p-6 md:p-10">
-          <div className="max-w-6xl mx-auto space-y-10">
-            {/* Header */}
-            <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div className="space-y-1">
-                <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-                  Select <span className="text-blue-600 underline decoration-blue-200 underline-offset-8">Category</span>
-                </h1>
-                <p className="text-slate-500 text-sm font-medium">Hello {user?.displayName?.split(' ')[0] || 'Teacher'}, which preparation track are we on today?</p>
-              </div>
-            </header>
-
-            {user?.email === 'qzquiz50@gmail.com' && (
-              <div className="bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-[2rem] p-6 space-y-4 sm:space-y-0 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-md border border-white/10">
-                <div className="space-y-1 text-center sm:text-left">
-                  <span className="text-[9px] font-black uppercase tracking-widest bg-white/20 px-2.5 py-1 rounded">ADMIN ACCESS / व्यवस्थापक नियंत्रण</span>
-                  <h3 className="font-black text-xl pt-1 tracking-tight">प्रशासक डैशबोर्ड / Actions Dashboard</h3>
-                  <p className="text-xs opacity-95">प्रमोटर भुगतान निकासी, नवीन मॉक टेस्ट निर्माण और प्रश्न पत्र संकलन प्रबंधित करें।</p>
+    <div className="min-h-screen bg-slate-50 text-slate-800 pb-20">
+      {/* Top Navbar */}
+      <nav className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center gap-4">
+              {onBackToHome && (
+                <button
+                  type="button"
+                  onClick={onBackToHome}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Tools Directory</span>
+                </button>
+              )}
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold text-sm">
+                  M
                 </div>
-                <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto shrink-0">
-                  <button
-                    onClick={() => navigate('/create-mock')}
-                    className="w-full sm:w-auto px-5 py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-blue-900/40"
-                    id="btn-admin-create-mock"
-                  >
-                    <Plus className="w-4 h-4 text-white" />
-                    नया मॉक टेस्ट बनाएं / Create Mock
-                  </button>
-                  <button
-                    onClick={() => navigate('/promoterswithdrawalrequests')}
-                    className="w-full sm:w-auto px-5 py-3.5 bg-slate-950 hover:bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-1.5 shrink-0"
-                    id="btn-admin-withdrawal-requests"
-                  >
-                    भुगतान डेस्क / Enter Desk
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {connectionError && (
-              <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-4 flex items-start gap-3 shadow-sm alert-offline-sync animate-fade-in" id="alert-offline-notice">
-                <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <p className="text-xs font-bold uppercase tracking-wider">सर्वर कनेक्ट करने का प्रयास जारी है… / Reconnecting to Service…</p>
-                  <p className="text-[11px] text-amber-700 leading-relaxed font-medium">
-                    नया बनाया गया मॉक टेस्ट प्रदर्शित होने में कभी-कभी Google Cloud सर्वर कोल्ड-स्टार्ट के कारण एकाध मिनट लग सकता है। जब तक डेटा लोड नहीं हो जाता, पुरानी जानकारी ऑफ़लाइन मोड में संचित रहेगी। कृपया थोड़े समय में पेज रिफ्रेश (F5) करें।
+                <div>
+                  <h1 className="text-sm sm:text-base font-bold text-slate-900 leading-none">
+                    Mockia Visitor Analytics
+                  </h1>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Direct access URL: <code className="text-slate-700 bg-slate-100 px-1 py-0.5 rounded font-mono">mockia.in/dashboard</code>
                   </p>
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-6">
-              <div className="space-y-6 pt-2 border-t border-slate-200">
-                {/* Select Category Divider Header */}
-                <div className="pt-2">
-                  <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                    <span className="text-blue-600">📚</span> MPTET Exam Subjects / परीक्षा संवर्ग
-                  </h2>
-                  <p className="text-slate-500 text-xs font-semibold mt-1">
-                    Select from our 3 primary teacher certification divisions / अपना इच्छित परीक्षा वर्ग चुनें:
-                  </p>
-                </div>
-
-                {/* Varg Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 pb-20">
-                  {categories.map((cat, i) => (
-                    <motion.div
-                      key={cat.id}
-                      initial={{ opacity: 0, y: 30 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.1, duration: 0.5 }}
-                      whileHover={{ y: -8, shadow: '0 20px 40px -15px rgba(0,0,0,0.3)' }}
-                      onClick={() => navigate(cat.path)}
-                      className="relative bg-blue-900 text-white rounded-[2rem] p-6 cursor-pointer group transition-all overflow-hidden border border-white/5"
-                    >
-                      {/* Decorative background shape */}
-                      <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-blue-600 blur-3xl opacity-20 group-hover:opacity-40 transition-opacity duration-500" />
-                      
-                      <div className="relative z-10 font-sans">
-                        <div className="w-12 h-12 rounded-xl mb-4 flex items-center justify-center bg-white/10 text-white transition-all duration-300 transform group-hover:scale-110 group-hover:rotate-3 border border-white/10">
-                          <cat.icon className="w-6 h-6" />
-                        </div>
-                        
-                        <div className="space-y-1.5">
-                          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400">{cat.subtitle}</p>
-                          <h3 className="text-xl font-black leading-tight tracking-tight">{cat.title}</h3>
-                          <p className="text-blue-200/60 text-xs leading-relaxed font-semibold line-clamp-2 pr-4">{cat.description}</p>
-                        </div>
-
-                        <div className="mt-6 flex items-center justify-end pt-4 border-t border-white/10">
-                          <div className="flex items-center gap-2 font-black text-[10px] uppercase tracking-widest text-blue-400 group-hover:text-white group-hover:translate-x-1 transition-all">
-                            SELECT TRACK
-                            <ArrowRight className="w-4 h-4" />
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
-
-                  {/* 4th Card: GK Questions / सामान्य ज्ञान */}
-                  {customGkTests.length > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 30 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.3, duration: 0.5 }}
-                      whileHover={{ y: -8, shadow: '0 20px 40px -15px rgba(0,0,0,0.3)' }}
-                      onClick={() => navigate('/varg/gk/tests')}
-                      className="relative bg-slate-900 text-white rounded-[2rem] p-6 cursor-pointer group transition-all overflow-hidden border border-white/5 hover:border-amber-500/30"
-                    >
-                      {/* Decorative background shape */}
-                      <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-amber-500 blur-3xl opacity-10 group-hover:opacity-25 transition-opacity duration-500" />
-                      
-                      <div className="relative z-10 flex flex-col justify-between h-full font-sans">
-                        <div>
-                          <div className="w-12 h-12 rounded-xl mb-4 flex items-center justify-center bg-amber-500/10 text-amber-400 border border-amber-500/20 transition-all duration-300 transform group-hover:scale-110 group-hover:rotate-3">
-                            <BookOpen className="w-6 h-6" />
-                          </div>
-                          
-                          <div className="space-y-1.5">
-                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-400">
-                              Practice / अभ्यास
-                            </p>
-                            <h3 className="text-xl font-black leading-tight tracking-tight flex items-center gap-2">
-                              GK Questions / सामान्य ज्ञान
-                            </h3>
-                            <p className="text-xs leading-relaxed font-semibold line-clamp-2 pr-4 text-slate-400">
-                              सामान्य ज्ञान अभ्यास मॉक टेस्ट सीरीज उपलब्ध है।
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="mt-6 flex items-center justify-between pt-4 border-t border-white/10">
-                          <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 font-mono">
-                            {customGkTests.length} TESTS AVAILABLE
-                          </span>
-                          <div className="flex items-center gap-2 font-black text-[10px] uppercase tracking-widest text-amber-400 group-hover:text-white group-hover:translate-x-1 transition-all">
-                            VIEW TESTS
-                            <ArrowRight className="w-4 h-4" />
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
                 </div>
               </div>
             </div>
-            <Footer />
-          </div>
-        </main>
 
-      </div>
-
-      {isCheckoutOpen && selectedTest && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95, y: 15 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="bg-white rounded-2xl sm:rounded-[2rem] w-full max-w-md p-5 sm:p-6 border border-slate-100 shadow-2xl relative space-y-4 sm:space-y-5 my-auto max-h-[90vh] flex flex-col overflow-hidden"
-          >
-            {/* Close */}
-            <button 
-              onClick={() => setIsCheckoutOpen(false)}
-              className="absolute right-4 top-4 sm:right-6 sm:top-6 w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors z-10"
-            >
-              <X className="w-4 h-4" />
-            </button>
-
-            {/* Scrollable Container Content */}
-            <div className="overflow-y-auto pr-1 space-y-4 sm:space-y-5 scrollbar-thin">
-              {/* Header / Summary */}
-              <div className="space-y-1.5 pt-4 sm:pt-2">
-                <span className="inline-block text-[8px] sm:text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2.5 py-1 rounded-full">
-                  Secure Checkout / सुरक्षित भुगतान
-                </span>
-                <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-normal font-sans">
-                  {selectedTest.title}
-                </h3>
-                <p className="text-[11px] sm:text-xs text-slate-400">MPTET {selectedTest.vargId === 'gk' ? 'GK' : selectedTest.vargId === 'varg1' ? 'Varg 1' : selectedTest.vargId === 'varg2' ? 'Varg 2' : 'Varg 3'} • {selectedTest.subject ? selectedTest.subject.charAt(0).toUpperCase() + selectedTest.subject.slice(1) : 'General'} Mock Test</p>
+            <div className="flex items-center gap-3">
+              {/* Real-time Indicator */}
+              <div className="hidden sm:flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs px-2.5 py-1 rounded-full font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Live Real-Time Sync</span>
               </div>
 
-              {/* Price breakdown */}
-              {(() => {
-                const displayOrigPrice = selectedTest.price ?? platformSettings.testPrice;
-                const displayNetPayable = promoApplied 
-                  ? Math.max(0, displayOrigPrice - platformSettings.studentDiscount)
-                  : displayOrigPrice;
+              {/* Auto Refresh Toggle */}
+              <button
+                type="button"
+                onClick={() => setAutoRefresh(!autoRefresh)}
+                className={`text-xs px-2.5 py-1 rounded-lg border font-medium transition-colors cursor-pointer ${
+                  autoRefresh
+                    ? 'bg-slate-900 text-white border-slate-900'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                }`}
+                title="Toggle 15s auto-refresh"
+              >
+                Auto-Refresh: {autoRefresh ? 'ON' : 'OFF'}
+              </button>
 
-                return (
-                  <>
-                    <div className="bg-slate-50 rounded-xl sm:rounded-2xl p-3.5 sm:p-4 border border-slate-150 space-y-2 sm:space-y-2.5">
-                      <div className="flex justify-between items-center text-[11px] sm:text-xs text-slate-500 font-medium">
-                        <span>वास्तविक मूल्य / Original Price</span>
-                        <span>₹{displayOrigPrice}.00</span>
+              {/* Manual Refresh Button */}
+              <button
+                type="button"
+                onClick={() => loadData(true)}
+                disabled={refreshing}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 px-3 py-1.5 rounded-lg transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-slate-900' : 'text-slate-500'}`} />
+                <span className="hidden sm:inline">Refresh</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {/* Main Content Container */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+        
+        {/* Banner with private note */}
+        <div className="mb-6 bg-white border border-slate-200 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-slate-100 text-slate-700 mt-0.5">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900">
+                Private Visitor Tracking Active
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                No buttons or links to this dashboard are visible anywhere on the public website. You access it exclusively by typing or bookmarking <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800 font-mono">/dashboard</code>.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end sm:self-center">
+            <button
+              type="button"
+              onClick={handleTriggerTestVisit}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+              title="Send a sample page visit into Firestore to test live updates"
+            >
+              <MousePointerClick className="w-3.5 h-3.5" />
+              <span>Simulate Test Visit</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Feedback alert for simulated visit */}
+        {testVisitSuccess && (
+          <div className="mb-6 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs px-4 py-2.5 rounded-xl flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{testVisitSuccess}</span>
+          </div>
+        )}
+
+        {/* Primary Metric KPI Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
+          
+          {/* 1. Total Visitors */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs relative overflow-hidden">
+            <div className="flex items-center justify-between text-slate-500 mb-3">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Visitors</span>
+              <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                <Users className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+              {loading ? '...' : (overview.totalVisitors || 0).toLocaleString()}
+            </div>
+            <div className="mt-2.5 flex items-center justify-between text-xs text-slate-500">
+              <span>All-time unique visitors</span>
+              <span className="font-medium text-slate-700">Site-wide</span>
+            </div>
+            <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+              <span>Avg views / visitor:</span>
+              <span className="font-semibold text-slate-600">{avgViewsPerVisitor}</span>
+            </div>
+          </div>
+
+          {/* 2. Today's Visitors */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs relative overflow-hidden">
+            <div className="flex items-center justify-between text-slate-500 mb-3">
+              <span className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Today Visitors</span>
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <Calendar className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight flex items-baseline gap-2">
+              <span>{loading ? '...' : (todayStats.uniqueVisitors || 0).toLocaleString()}</span>
+              <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                Active
+              </span>
+            </div>
+            <div className="mt-2.5 flex items-center justify-between text-xs text-slate-500">
+              <span>Unique visitors today</span>
+              <span className="font-medium text-slate-700 font-mono text-[11px]">{todayKey}</span>
+            </div>
+            <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+              <span>Today views / visitor:</span>
+              <span className="font-semibold text-slate-600">{todayViewsPerVisitor}</span>
+            </div>
+          </div>
+
+          {/* 3. Total Page Views */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs relative overflow-hidden">
+            <div className="flex items-center justify-between text-slate-500 mb-3">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Page Views</span>
+              <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <Eye className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+              {loading ? '...' : (overview.totalPageViews || 0).toLocaleString()}
+            </div>
+            <div className="mt-2.5 flex items-center justify-between text-xs text-slate-500">
+              <span>All tool views & visits</span>
+              <span className="font-medium text-slate-700">100 Tools</span>
+            </div>
+            <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+              <span>Engagement:</span>
+              <span className="font-semibold text-slate-600">Calculators & Tools</span>
+            </div>
+          </div>
+
+          {/* 4. Today's Page Views */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs relative overflow-hidden">
+            <div className="flex items-center justify-between text-slate-500 mb-3">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Today Page Views</span>
+              <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
+                <TrendingUp className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+              {loading ? '...' : (todayStats.pageViews || 0).toLocaleString()}
+            </div>
+            <div className="mt-2.5 flex items-center justify-between text-xs text-slate-500">
+              <span>Total views logged today</span>
+              <span className="font-medium text-slate-700">Live</span>
+            </div>
+            <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+              <span>Last updated:</span>
+              <span className="font-semibold text-slate-600">
+                {lastRefreshedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </span>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Middle Section: Daily Traffic Trend & Popular Pages */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          
+          {/* Daily Trend (2 Cols) */}
+          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-xs">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                  Daily Visitor Activity
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Unique visitors and page views over recent days
+                </p>
+              </div>
+              <div className="flex items-center gap-3 text-xs">
+                <div className="flex items-center gap-1.5 text-slate-600">
+                  <span className="w-2.5 h-2.5 rounded-sm bg-slate-900"></span>
+                  <span>Visitors</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-slate-600">
+                  <span className="w-2.5 h-2.5 rounded-sm bg-slate-300"></span>
+                  <span>Views</span>
+                </div>
+              </div>
+            </div>
+
+            {dailyHistory.length === 0 ? (
+              <div className="py-12 text-center text-xs text-slate-400">
+                Traffic history will accumulate as visitors browse pages on mockia.in
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Visual Bars */}
+                {dailyHistory.map((item) => {
+                  const maxDaily = Math.max(
+                    ...dailyHistory.map(d => Math.max(d.uniqueVisitors, d.pageViews, 10))
+                  );
+                  const visitorPct = Math.min(100, Math.max(8, (item.uniqueVisitors / maxDaily) * 100));
+                  const pageViewPct = Math.min(100, Math.max(8, (item.pageViews / maxDaily) * 100));
+                  const isCurrentDay = item.date === todayKey;
+
+                  return (
+                    <div key={item.date} className="text-xs">
+                      <div className="flex items-center justify-between text-slate-600 mb-1">
+                        <span className={`font-mono ${isCurrentDay ? 'font-bold text-slate-900 flex items-center gap-1' : ''}`}>
+                          {item.date} {isCurrentDay && <span className="text-[10px] text-emerald-600 font-sans font-semibold bg-emerald-50 px-1 rounded">Today</span>}
+                        </span>
+                        <div className="flex items-center gap-3">
+                          <span className="font-semibold text-slate-900">
+                            {item.uniqueVisitors} <span className="font-normal text-slate-500">visitors</span>
+                          </span>
+                          <span className="text-slate-400">/</span>
+                          <span className="text-slate-600">
+                            {item.pageViews} <span className="font-normal text-slate-400">views</span>
+                          </span>
+                        </div>
                       </div>
 
-                      {promoApplied && (
-                        <div className="flex justify-between items-center text-[11px] sm:text-xs text-emerald-600 font-bold">
-                          <span>🎟 प्रमोकोड छूट / Promo Discount ({promoApplied.promoCode})</span>
-                          <span>- ₹{platformSettings.studentDiscount}.00</span>
-                        </div>
-                      )}
+                      {/* Stacked Progress Bar */}
+                      <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden flex gap-0.5">
+                        <div
+                          className="bg-slate-900 h-full rounded-l-full transition-all duration-500"
+                          style={{ width: `${visitorPct}%` }}
+                          title={`Unique Visitors: ${item.uniqueVisitors}`}
+                        />
+                        <div
+                          className="bg-slate-300 h-full rounded-r-full transition-all duration-500"
+                          style={{ width: `${pageViewPct}%` }}
+                          title={`Page Views: ${item.pageViews}`}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
-                      <hr className="border-slate-100" />
+          {/* Quick Insights & Breakdown (1 Col) */}
+          <div className="space-y-6">
+            
+            {/* Top Visited Pages */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
+              <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center justify-between">
+                <span>Top Visited Pages</span>
+                <Compass className="w-4 h-4 text-slate-400" />
+              </h3>
 
-                      <div className="flex justify-between items-center">
-                        <span className="text-[11px] sm:text-xs font-black text-slate-800 uppercase tracking-wider">कुल भुगतान / Net Payable</span>
-                        <span className="text-lg sm:text-xl font-black text-blue-600 font-mono">
-                          ₹{displayNetPayable.toFixed(2)}
+              {sortedPopular.length === 0 ? (
+                <p className="text-xs text-slate-400 py-4 text-center">
+                  Page visit breakdown will appear here.
+                </p>
+              ) : (
+                <div className="space-y-2.5">
+                  {sortedPopular.map(([name, count], idx) => (
+                    <div key={name} className="flex items-center justify-between text-xs py-1.5 border-b border-slate-50 last:border-0">
+                      <div className="flex items-center gap-2 truncate pr-2">
+                        <span className="w-4 text-slate-400 font-mono text-[11px]">{idx + 1}.</span>
+                        <span className="font-medium text-slate-800 truncate" title={name}>
+                          {name}
                         </span>
                       </div>
+                      <span className="bg-slate-100 text-slate-700 font-semibold px-2 py-0.5 rounded text-[11px] shrink-0">
+                        {count} visits
+                      </span>
                     </div>
-
-                    {/* Promocode Apply Input */}
-                    <div className="space-y-1.5">
-                      <label className="text-[9px] sm:text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                        यदि आपके पास प्रमोकोड है तो दर्ज करें / Have a Promo Code?
-                      </label>
-                      <div className="flex gap-2">
-                        <input 
-                          type="text" 
-                          value={promoVal} 
-                          onChange={(e) => setPromoVal(e.target.value)}
-                          placeholder="जैसे: TIWARI5"
-                          className="flex-1 px-3 sm:px-4 py-2 sm:py-2.5 bg-slate-50 font-mono text-xs sm:text-sm uppercase rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-bold tracking-wider"
-                          disabled={promoLoading}
-                        />
-                        <button 
-                          onClick={() => handleApplyPromo(promoVal)}
-                          disabled={promoLoading || !promoVal.trim()}
-                          className="px-3 sm:px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-[10px] sm:text-xs font-black transition-all uppercase tracking-wider shrink-0 disabled:bg-slate-200 disabled:text-slate-400"
-                        >
-                          {promoLoading ? 'जांचें...' : 'लागू करें / Apply'}
-                        </button>
-                      </div>
-
-                      {promoError && (
-                        <p className="text-[11px] sm:text-xs text-rose-500 font-bold flex items-center gap-1.5 pt-0.5">
-                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                          {promoError}
-                        </p>
-                      )}
-
-                      {promoApplied && (
-                        <p className="text-[11px] sm:text-xs text-emerald-600 font-bold flex items-center gap-1.5 pt-0.5 animate-bounce">
-                          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                          बधाई हो! ₹{platformSettings.studentDiscount} की बचत लागू की गई है।
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Actions */}
-                    <div className="space-y-2 pt-1">
-                      <button 
-                        onClick={handlePayment}
-                        className={`w-full py-3 sm:py-3.5 text-white font-black text-[11px] sm:text-xs uppercase tracking-widest rounded-xl sm:rounded-2xl transition-all shadow-lg transform active:scale-95 ${
-                          selectedTest.isFree || displayNetPayable === 0
-                            ? 'bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 shadow-emerald-500/10'
-                            : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/10'
-                        }`}
-                      >
-                        {selectedTest.isFree || displayNetPayable === 0 ? (
-                          'निशुल्क अनलॉक करें / Unlock for Free'
-                        ) : (
-                          `₹${displayNetPayable} का भुगतान करें / Proceed to Pay`
-                        )}
-                      </button>
-                      <p className="text-[8px] sm:text-[9px] text-slate-400 text-center leading-relaxed font-semibold font-sans">
-                        {selectedTest.isFree || displayNetPayable === 0 ? (
-                          '* यह टेस्ट बिल्कुल मुफ्त है। अनलॉक बटन पर क्लिक करके अभ्यास शुरू करें।'
-                        ) : (
-                          '* सुरक्षित और पारदर्शी पेमेंट Razorpay क्रेडेंशियल्स द्वारा संचालित है।'
-                        )}
-                      </p>
-                    </div>
-                  </>
-                );
-              })()}
+                  ))}
+                </div>
+              )}
             </div>
-          </motion.div>
+
+            {/* Device & Client Breakdown */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
+              <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center justify-between">
+                <span>Visitor Devices</span>
+                <Monitor className="w-4 h-4 text-slate-400" />
+              </h3>
+
+              <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <Monitor className="w-4 h-4 mx-auto text-slate-600 mb-1" />
+                  <div className="font-bold text-slate-900">{deviceCounts['Desktop'] || 0}</div>
+                  <div className="text-[10px] text-slate-500">Desktop</div>
+                </div>
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <Smartphone className="w-4 h-4 mx-auto text-slate-600 mb-1" />
+                  <div className="font-bold text-slate-900">{deviceCounts['Mobile'] || 0}</div>
+                  <div className="text-[10px] text-slate-500">Mobile</div>
+                </div>
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <Globe className="w-4 h-4 mx-auto text-slate-600 mb-1" />
+                  <div className="font-bold text-slate-900">{deviceCounts['Tablet'] || 0}</div>
+                  <div className="text-[10px] text-slate-500">Tablet</div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
         </div>
-      )}
+
+        {/* Bottom Section: Recent Visitor Log Stream */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-xs">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-5">
+            <div>
+              <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+                <Activity className="w-4 h-4 text-slate-600" />
+                <span>Live Recent Visits Log</span>
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Individual page views logged in real time as users explore Mockia
+              </p>
+            </div>
+            <div className="text-xs text-slate-500">
+              Showing last {recentEvents.length} visits
+            </div>
+          </div>
+
+          {recentEvents.length === 0 ? (
+            <div className="py-12 text-center text-xs text-slate-400">
+              No recent visit events recorded yet. Navigate to any tool to see it appear live here!
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
+                    <th className="py-3 px-3">Time</th>
+                    <th className="py-3 px-3">Page / Tool Visited</th>
+                    <th className="py-3 px-3">Type</th>
+                    <th className="py-3 px-3">Device & Browser</th>
+                    <th className="py-3 px-3">Referrer</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {recentEvents.map((ev, index) => (
+                    <tr key={ev.id || index} className="hover:bg-slate-50/75 transition-colors">
+                      <td className="py-3 px-3 whitespace-nowrap text-slate-500">
+                        <span className="font-mono text-[11px] text-slate-700">
+                          {formatTimeAgo(ev.createdAt)}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3">
+                        <div className="font-medium text-slate-900">
+                          {ev.toolName || (ev.path === '/' ? 'Home Directory' : ev.path)}
+                        </div>
+                        <div className="text-[11px] font-mono text-slate-400 truncate max-w-xs">
+                          {ev.path}
+                        </div>
+                      </td>
+                      <td className="py-3 px-3 whitespace-nowrap">
+                        {ev.isNewVisitor ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">
+                            New Visitor
+                          </span>
+                        ) : ev.isFirstToday ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                            First Today
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600">
+                            Repeat View
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-3 whitespace-nowrap text-slate-600">
+                        <div className="flex items-center gap-1.5">
+                          {ev.deviceType === 'Mobile' ? (
+                            <Smartphone className="w-3.5 h-3.5 text-slate-400" />
+                          ) : (
+                            <Monitor className="w-3.5 h-3.5 text-slate-400" />
+                          )}
+                          <span>{ev.deviceType}</span>
+                          <span className="text-slate-300">•</span>
+                          <span className="text-slate-500">{ev.browser} / {ev.os}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-3 whitespace-nowrap text-slate-500">
+                        <span className="bg-slate-100 px-2 py-0.5 rounded text-[11px] text-slate-600">
+                          {ev.referrer || 'Direct'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+      </div>
     </div>
   );
 }

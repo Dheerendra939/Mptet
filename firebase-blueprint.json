@@ -269,6 +269,92 @@
         }
       },
       "required": ["title", "vargId", "subject", "time", "questionsCount", "price", "isFree", "questions", "createdAt"]
+    },
+    "SiteAnalytics": {
+      "title": "Site Analytics",
+      "description": "Global website visitors and pageviews metrics.",
+      "type": "object",
+      "properties": {
+        "totalVisitors": {
+          "type": "number",
+          "description": "Total unique visitors."
+        },
+        "totalPageViews": {
+          "type": "number",
+          "description": "Total page views across the site."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["totalVisitors"]
+    },
+    "SiteDailyStats": {
+      "title": "Site Daily Stats",
+      "description": "Daily metrics for unique visitors and pageviews.",
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string",
+          "description": "Date string in YYYY-MM-DD format."
+        },
+        "uniqueVisitors": {
+          "type": "number",
+          "description": "Number of unique visitors today."
+        },
+        "pageViews": {
+          "type": "number",
+          "description": "Number of pageviews today."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["date", "uniqueVisitors"]
+    },
+    "VisitorEvent": {
+      "title": "Visitor Event",
+      "description": "Log record for an individual page visit event.",
+      "type": "object",
+      "properties": {
+        "visitorId": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "toolName": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "referrer": {
+          "type": "string"
+        },
+        "deviceType": {
+          "type": "string"
+        },
+        "browser": {
+          "type": "string"
+        },
+        "os": {
+          "type": "string"
+        },
+        "isNewVisitor": {
+          "type": "boolean"
+        },
+        "isFirstToday": {
+          "type": "boolean"
+        }
+      },
+      "required": ["visitorId", "path", "date", "timestamp"]
     }
   },
   "firestore": {
@@ -295,6 +381,18 @@
     "/Settings/{settingId}": {
       "schema": "PlatformSettings",
       "description": "Global settings for pricing, commissions, and discounts."
+    },
+    "/SiteAnalytics/{docId}": {
+      "schema": "SiteAnalytics",
+      "description": "Global website analytics overview document."
+    },
+    "/SiteDailyStats/{dateId}": {
+      "schema": "SiteDailyStats",
+      "description": "Daily visitor and pageview metrics."
+    },
+    "/VisitorEvents/{eventId}": {
+      "schema": "VisitorEvent",
+      "description": "Individual visitor event logs."
     }
   }
 }

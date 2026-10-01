@@ -96,5 +96,21 @@ service cloud.firestore {
     match /test/{docId} {
       allow read, write: if true;
     }
+
+    // 10. Site Analytics & Visitor Tracking
+    match /SiteAnalytics/{docId} {
+      // Public site visits track aggregate counts
+      allow read, write: if true;
+    }
+
+    match /SiteDailyStats/{dateId} {
+      // Daily unique visitor and pageview stats
+      allow read, write: if true;
+    }
+
+    match /VisitorEvents/{eventId} {
+      // Page visit activity log
+      allow read, write: if true;
+    }
   }
 }
